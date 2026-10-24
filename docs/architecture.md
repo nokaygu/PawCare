@@ -1,21 +1,21 @@
-# PawCare — Mimari ve Klasör Yapısı
+# PawCare — Feature-First Mimari ve SOLID Kuralları (`architecture.md`)
 
-## 1. Mimari yaklaşım
+## 1. Mimari Yaklaşım
 
-**Feature-first + katmanlı yapı** kullanılacaktır. Her özellik kendi ekran, durum yönetimi ve bileşenlerini barındırır. UI, veri erişimini doğrudan yapmaz.
+Mevcut **Feature-first + katmanlı yapı** korunmaktadır. Her özellik kendi ekran (`view`), durum yönetimi (`controller`) ve alt bileşenlerini (`widgets`) barındırır. UI katmanı veri erişimini doğrudan yapmaz ve içerisinde metin, stil/renk veya boyut sabiti barındırmaz.
 
 Veri akışı:
 
-`View → Cubit → Repository → Local Data Source`
+`View → Controller (ValueNotifier) → Repository → Hive Local Data Source`
 
-- **View:** Ekranı oluşturur, kullanıcı etkileşimlerini Cubit'e iletir.
-- **Cubit:** Ekranın durumunu ve kullanıcı işlemlerini yönetir.
-- **Repository:** Veriye erişimin arayüzünü ve iş kurallarını yönetir.
-- **Data Source:** Hive veya JSON üzerinden veri okur/yazar.
+- **View:** Yalnızca ekranı oluşturur, temadan aldığı renk/yazı stillerini, `AppDimens` ölçülerini ve `AppStrings` metinlerini uygular, kullanıcı etkileşimlerini Controller'a iletir.
+- **Controller:** Ekranın reaktif durumunu (`ValueNotifier`) ve kullanıcı işlemlerini yönetir (`HomeController`, `DiscoveryController`, `PetsController`, `BookingsController`, `ProviderController`, `ProfileController`, `NotificationsController`, `AuthController`).
+- **Repository:** Veriye erişimin arayüzünü ve iş kurallarını yönetir (`DogRepository`, `SitterRepository`, `BookingRepository`, `NotificationRepository`, `SettingsRepository`).
+- **Hive Local Data Source:** Tüm uygulama verilerini (`dogs_box`, `sitters_box`, `bookings_box`, `notifications_box`, `settings_box`) okur ve yazar. JSON veya SharedPreferences kullanılmaz.
 
-Basit bir işlem için gereksiz katman, soyutlama veya dosya oluşturulmaz.
+---
 
-## 2. Hedef klasör yapısı
+## 2. Güncel Klasör Yapısı
 
 ```text
 lib/
@@ -24,86 +24,116 @@ lib/
     app.dart
     router/
       app_router.dart
-      route_names.dart
+      app_shell.dart           # Controller senkronizasyonu ve rol bazlı 5 sekmeli kabuk
   core/
     theme/
+      app_colors.dart          # TEK RENK TANIM DOSYASI
+      app_typography.dart      # TEK YAZI TİPİ, BOYUT VE KALINLIK (FontWeight) DOSYASI
+      app_theme.dart           # Light & Haki Dark ThemeData ve PawThemeExtension
+      theme_controller.dart    # Hive settings_box bağlantılı reaktif tema yönetimi
     constants/
+      app_dimens.dart          # TEK BOYUT, PADDING, MARGIN, RADIUS VE ALPHA DOSYASI
+      app_strings.dart         # TEK METİN VE ÇOKLU DİL (i18n/l10n) SABİTLERİ DOSYASI
     utils/
-    widgets/
+      image_storage_service.dart
+    widgets/                   # Ortak DRY bileşenler (PawBottomNav, PawDateRangeCalendar, PawHeaderActions vb.)
+      modals/
+        call_modal.dart
+        chat_modal.dart
+        live_tracking_modal.dart
   data/
     local/
+      hive_boxes.dart
+      hive_seed_data.dart      # Saf Dart başlangıç verileri (JSON yok!)
     repositories/
+      dog_repository.dart      # Çoklu köpek, aktif köpek ve aşı yönetimi
+      sitter_repository.dart   # Hizmet veren ilan ve müsaitlik yönetimi
+      booking_repository.dart  # Rezervasyon oluşturma, durum güncelleme, iptal ve mesajlaşma
+      notification_repository.dart
+      settings_repository.dart # Tema, aktif rol, aktif köpek, sahip ve bakıcı kimlik bilgileri
     models/
+      models.dart              # Immutable, copyWith ve toMap/fromMap destekli modeller (petPhotoPath, ownerName dahil)
   features/
     onboarding/
       view/
-      cubit/
       widgets/
     auth/
       view/
-      cubit/
+      controller/
       widgets/
     home/
       view/
-      cubit/
+      controller/
       widgets/
     discovery/
       view/
-      cubit/
+      controller/
       widgets/
     pets/
       view/
-      cubit/
+      controller/
       widgets/
+        dog_form_modals.dart       # EditDogProfileModal, AddDogModal, MicrochipIdentityModal
+        dog_profile_sections.dart  # DogSelectorChipsRow ve profil kartları
+        health_card_modal.dart     # Dinamik aşı karnesi ve durum değiştirme
     bookings/
       view/
-      cubit/
+      controller/
       widgets/
     provider/
       view/
-      cubit/
+      controller/
       widgets/
     profile/
       view/
-      cubit/
+      controller/
       widgets/
+        profile_modals.dart        # EditUserProfileModal ve ProfileInfoModal
+        profile_sections.dart      # Rol duyarlı ProfileUserSummaryCard ve ayarlar
     notifications/
       view/
-      cubit/
+      controller/
       widgets/
     splash/
       view/
-      cubit/
       widgets/
 assets/
   images/
-  data/
+docs/
+  architecture.md
+  design-system.md
+  plan.md
+  project.md
+  skills.md
 test/
+eksiklikler.md
+yapilanlar.md
 ```
 
-Bu yapı hedef yapıdır; her özellik için kullanılmayan klasörler veya boş dosyalar oluşturulmaz. Mevcut proje dosyaları incelendikten sonra gerekli klasörler oluşturulur ve mevcut kod uygun yerlere taşınır. Model dosyaları, mevcut tasarıma ve veri akışına göre `data/models/` altında tutulabilir.
+---
 
-## 3. Katman sorumlulukları
+## 3. SOLID ve Mimari Kurallar
 
-- `main.dart`: Flutter başlangıcı, gerekli servislerin başlatılması ve uygulamanın çalıştırılması.
-- `app/`: Uygulama kurulumu, tema bağlantısı ve GoRouter yapılandırması.
-- `core/`: Temalar, sabitler, yardımcı araçlar ve özellikler arasında ortak kullanılan widget'lar.
-- `data/`: Modeller, Hive kutuları, JSON kaynakları ve repository uygulamaları.
-- `features/`: Kullanıcıya görünen özellikler; her özellik kendi View, Cubit ve gerektiğinde Widgets dosyalarını içerir.
-- `assets/`: Yerel görseller, logo ve başlangıç verileri.
-- `test/`: Model, Cubit, repository ve kritik kullanıcı akışı testleri.
+1. **Tek Sorumluluk (SRP) ve Metod Uzunluğu:** Hiçbir `build` metodu 40 satırı geçemez (kaynak dosyalarında denetlenir). Karmaşık bölümler özel metodlara (`_build...`) veya `widgets/` klasöründeki alt bileşenlere ayrılır.
+2. **Sıfır Satır İçi Metin, Stil ve Ölçü:** `features/` veya `core/widgets/` altındaki hiçbir dosyada doğrudan kullanıcı metni, `Color(...)`, `Colors.xxx`, `FontWeight.w...`, `TextStyle(...)` veya sayısal `padding`/`margin`/`radius`/`width`/`height` tanımlanamaz; yalnızca `core/theme/`, `core/constants/app_dimens.dart` ve `core/constants/app_strings.dart` üzerinden gelen sabitler kullanılır.
+3. **Tek Veri Kaynağı (`Hive`) ve Reaktif Senkronizasyon:** View katmanı Hive'a doğrudan erişmez. Tüm okuma/yazma işlemleri Repository sınıfları üzerinden yapılır ve `AppShell` içindeki controller dinleyicileri sayesinde bir sekmede yapılan değişiklik (aktif köpek değişimi, yeni köpek ekleme, rol değiştirme, ilan güncelleme, rezervasyon onay/iptal) tüm ekranlara anında yansır.
+4. **DRY (Tek İş = Tek Widget & Sıfır Navigasyon Tekrarı):** Tarih seçici takvim, durum rozeti, avatar görüntüleyici ve ortak modallar tek bir kez yazılır. Alt navigasyon barındaki (`PawBottomNav`) sekmeleri yalnızca tekrar eden gereksiz yönlendirme blokları (`Popüler Hizmetler`, `Hızlı Yönetim`, üst bar mükerrer profil ikonu) kaldırılarak her ekran kendi sorumluluğuna odaklanmıştır.
 
-## 4. Mimari kurallar
 
-1. View katmanı Hive'a veya JSON dosyalarına doğrudan erişmez.
-2. Birden fazla ekranın paylaştığı iş kuralları ilgili repository veya ortak servis içinde tutulur.
-3. Widget'lar mümkün olduğunca küçük ve yeniden kullanılabilir olmalıdır.
-4. Uygulama navigasyonu GoRouter üzerinden yönetilir.
-5. Tema değişimi merkezi tema yapılandırması üzerinden yapılır.
-6. Aynı veri için birden fazla bağımsız kaynak oluşturulmaz. Rezervasyon verisinin tek bir ortak kaynağı bulunur.
-7. Mevcut dosyalar taşınırken import'lar, route'lar, asset yolları, testler ve bağımlılıklar birlikte güncellenir.
-8. Dosyaları taşımak için mevcut kodu baştan yazmak yerine önce mevcut implementasyon korunur ve gerekli en küçük değişiklikler yapılır.
+## 4. Kesinti Sonrası Düzeltmeler — 25 Ekim 2026
 
-## 5. Mevcut kodun taşınması
+- `AppStrings`, `AppDimens`, `AppColors` ve `AppTheme` kaynaklarındaki dosya geneline yazılmış kaçışlı satır sonları onarıldı. Kaynak kodunda gerçek satır sonu, metin içinde gerekiyorsa Dart kaçışı kullanılır.
+- `HomeController` rezervasyonları ve sahip adını, `PetsController` köpek listesini, `ProviderState` bakıcı adını bellekte tutar. Getter ve `build` çağrıları Hive verisini yeniden ayrıştırmaz; değişikliklerden sonra açık yenileme yapılır.
+- İptal, onay, ilan/müsaitlik, profil ve kayıt/rol geçişi değişiklikleri `AppShell._syncAllListingsAndBookings` üzerinden ilgili controller'lara yayılır.
+- Sohbet anahtarı görünen isim yerine değişmeyen `sitterId` değeridir: `chat_messages_<sitterId>`. Mesajdaki `senderRole`, rol değiştiğinde gönderici ve balon yönünü korur. Eski tek havuzdaki demo geçmişi yalnız ilgili gezdirici konuşmasına taşınır.
+- Dinamik demo listeleri `createInitialSitters()` ve `createInitialBookings()` ile üretilir; test belleği tembel başlatılır ve `clearFallbackMemory()` ile bırakılır.
+- Fotoğraf kaydı başarıyla tamamlandıktan sonra başka köpek veya rezervasyon tarafından kullanılmayan eski uygulama fotoğrafı diskten ve iki görsel sağlayıcının önbelleğinden çıkarılır. Galerideki asıl dosya korunur. Görsel okuma asenkrondur; bulunamayan eski fotoğraf için paket içi görsel gösterilir.
+- `RouteNames` ve kullanılmayan `SplashController` kaldırıldı. Ortak başlık ve ekranlarda işlevsiz `onProfileTap` zinciri temizlendi.
+- Takvim ve rezervasyon controller'ı dolu günleri geçen aralıkları engeller; kayıt öncesi en güncel müsaitlik tekrar okunur.
 
-Yeni mimari mevcut dosya ve klasörler incelenmeden uygulanmaz. Önce mevcut yapı ve bağımlılıklar çıkarılır; ardından dosyalar hedef yapıya aşamalı olarak taşınır. Her aşamada analiz ve test yapılır. Çalışan tasarım veya işlevler, yalnızca klasör yapısını değiştirmek amacıyla yeniden yazılmaz.
+Denetim maddeleri: [`eksiklikler.md`](../eksiklikler.md). Son doğrulamalar: [`yapilanlar.md`](../yapilanlar.md).
+
+
+### Yeniden denetimde doğrulanan sınırlar
+
+Profil callback'i controller'ları yeniliyor; bakıcı adı yalnız ayarlarda değiştiği için SitterListing.name alanı ve ilan kartları güncellenmiyor (3.2 açık). Sohbetin mevcut `sitterId` anahtarı bakıcıları ayırıyor, aynı bakıcıya bağlı farklı sahipleri ayırmıyor (3.3 açık). Önceki senkronizasyon/kişi bazlı ayrım açıklamaları bu sınırlarla okunmalıdır; ayrıntılı kanıt `eksiklikler.md` bölüm 7 içindedir.
