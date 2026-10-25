@@ -21,11 +21,11 @@ Rol değiştirildiğinde hem alt navigasyon barındaki 5 sekme hem de Profil ve 
 
 - Karşılama, giriş ve kayıt arayüzleri (Modal tabanlı, seçilen role göre profil kaydı).
 - Merkezi `AppStrings` (`lib/core/constants/app_strings.dart`) sınıfı üzerinden çoklu dil (`i18n` / `l10n`) hazırlığı; UI bileşenleri içinde doğrudan gömülü metin bulunmaz.
-- Çoklu köpek profili yönetimi (`AddDogModal`, `EditDogProfileModal`, `DogSelectorChipsRow`), kalıcı cihaz fotoğrafı (`image_picker` + `path_provider`), interaktif aşı kayıtları (`HealthCardModal`), QR dijital mikroçip kimliği (`MicrochipIdentityModal`) ve özel bakım notları.
-- Otel, gündüz bakım ve gezdirme hizmetlerini arama, kategoriye/maksimum bütçeye/fiyat sıralamasına göre filtreleme (`_ExploreFilterModal`), dinamik sonuç sayacı (`_ExploreCountBanner`) ve inceleme.
+- Çoklu köpek profili yönetimi (`AddDogModal`, `EditDogProfileModal`, `DogSelectorChipsRow`), kalıcı cihaz fotoğrafı (`image_picker` + `path_provider`), interaktif aşı kayıtları (`HealthCardModal`), metin mikroçip kimliği (`MicrochipIdentityModal`) ve özel bakım notları.
+- Otel, gündüz bakım ve gezdirme hizmetlerini arama, kategoriye/maksimum bütçeye/fiyat sıralamasına göre filtreleme (`DiscoveryFilterModal`), dinamik sonuç sayacı (`_ExploreCountBanner`) ve inceleme.
 - Saf Flutter ile geliştirilmiş özel tarih aralığı seçici takvim (`PawDateRangeCalendar`) ve köpek seçici (`SitterPetSelectionCard`) üzerinden rezervasyon talebi oluşturma.
-- Beklemede, Onaylandı, Reddedildi ve Tamamlandı rezervasyon durumları; bekleyen talepleri iptal etme ve bakıcıya mesaj gönderme.
-- Hizmet veren paneli, ilan/ücret düzenleme (`_EditSitterListingModal`), müsaitlik yönetimi, dinamik kazanç/aktif konuk takibi ve doğrulanmış müşteri değerlendirmeleri (`_ReviewsListSection`).
+- Beklemede, Onaylandı, Reddedildi, İptal Edildi ve Tamamlandı durumları; bekleyen veya henüz başlamamış onaylı rezervasyonları iptal etme ve bakıcıya mesaj gönderme.
+- Hizmet veren paneli, ilan/ücret düzenleme (`_EditSitterListingModal`), müsaitlik yönetimi, onaylı brüt toplam/aktif konuk takibi, hizmet tamamlama ve örnek müşteri değerlendirmeleri (`_ReviewsListSection`).
 - Profil hesap düzenleme (`EditUserProfileModal`), Ödeme Yöntemleri / Gizlilik & Güvenlik / Yardım & Destek modalları (`ProfileInfoModal`) ve yerel bildirim arayüzleri.
 - Splash ekranı ve Açık / Koyu Yeşil (Haki) tema desteği.
 
@@ -51,19 +51,35 @@ Rol değiştirildiğinde hem alt navigasyon barındaki 5 sekme hem de Profil ve 
 
 ## 6. Başarı Ölçütü ve İlerleme Takibi (`yapilanlar.md` & `eksiklikler.md`)
 
-- Geliştirme adımları kök dizindeki `yapilanlar.md`, 21 teknik denetim maddesi `eksiklikler.md` dosyasında takip edilir. Tamamlanma durumu son doğrulama kaydıyla birlikte değerlendirilir.
+- Geliştirme adımları kök dizindeki `yapilanlar.md`, yeni 50 maddelik denetim `eksiklikler.md` dosyasında takip edilir. Tamamlanma durumu son doğrulama kaydıyla birlikte değerlendirilir.
 - Uygulama SOLID prensiplerine uygun, sıfır `flutter analyze` hatasına sahip, tüm birim ve widget testlerinden (`flutter test`) geçen, tutarlı tasarımlı ve kalıcı yerel verilere sahip durumdadır.
 
 
 ## 7. Kesinti Sonrası Davranışlar — 25 Ekim 2026
 
-Keşfet sonuçsuz kaldığında filtreleri ve arama kutusunu sıfırlayan boş durum kartı görünür. Rezervasyon kartları tarih aralığını gösterir; bakıcı paneli tüm onaylı konukları listeler. Ana sayfada yalnız bugün tarih aralığında olan onaylı rezervasyon aktif gösterilir; aksi durumda hizmet keşfetme kartı çıkar ve nabız animasyonu çalışmaz. Onay, iptal ve profil değişiklikleri diğer sekmelere yansır.
+Keşfet sonuçsuz kaldığında filtreleri ve arama kutusunu sıfırlayan boş durum kartı görünür. Rezervasyon kartları tarih aralığını gösterir; bakıcı paneli tüm onaylı konukları listeler. Ana sayfa seçili petId için gerçek başlangıç/bitiş saatini kullanır; aktif hizmeti, sıradaki onayı ve bekleyen/ek kayıt sayılarını ayırır. Aktif yürüyüş dışında takip aksiyonu sunulmaz. Sağlık özeti gecikmiş ve okunamayan kayıtları tamamlanmış saymaz. Onay, iptal ve profil değişiklikleri diğer sekmelere yansır.
 
-Sohbet geçmişi bakıcı kimliğine göre ayrılır ve rol değişiminde mesaj göndericisi korunur. Rezervasyon takvimi dolu günlerin üzerinden aralık seçilmesini engeller; eksik veya geçersiz tarihlerle gönderim kapatılır ve kayıt anında müsaitlik yeniden doğrulanır. Ücret birimleri ilana göre `gece`, `saat` veya `gün` olarak görünür. Bakıcı kazancı, ilgili ayda başlayan onaylı kayıtlardan hesaplanır; başlangıç toplamı sıfırdır.
+Sohbet geçmişi kararlı sahip–bakıcı kimlik çiftine göre ayrılır ve rol değişiminde mesaj göndericisi korunur. Rezervasyon takvimi dolu günlerin üzerinden aralık seçilmesini engeller; eksik veya geçersiz tarihlerle gönderim kapatılır ve kayıt anında müsaitlik yeniden doğrulanır. Ücret birimleri ilana göre `gece`, `saat` veya `gün` olarak görünür. Bakıcı kazancı, ilgili ayda başlayan onaylı kayıtlardan hesaplanır; başlangıç toplamı sıfırdır.
 
 `AppStrings` merkezi Türkçe metin kaynağıdır; başka dil paketleri veya çalışan bir dil seçici bu kapsamda eklenmemiştir. Hive ve yerel demo kapsamı korunmuştur. Son test ve analiz sonuçları [`yapilanlar.md`](../yapilanlar.md) içindedir.
 
+### Önceki 21 maddelik denetimin sonucu
 
-### Yeniden denetim notu — 25 Ekim 2026
+21/21 rapor maddesi tamamlandı; 61 test başarılı ve Flutter analizi temiz. Bakıcı profil adı doğru kalıcı ilanla eşitlenerek Home/Keşfet/panelde gösterilir. Farklı sahiplerin aynı bakıcıyla konuşmaları ayrılır; isim/e-posta değişikliği konuşma kimliğini değiştirmez. Aynı rol içindeki hesap geçişi kayıtları yeniler. Eski atanamayan mesajlar silinmeden Hive arşivinde korunur. Yerel demo kapsamı devam eder; son kanıtlar `eksiklikler.md` ve `yapilanlar.md` içindedir.
 
-Mevcut 40 test ve analiz temiz olsa da 3.2 ve 3.3 maddeleri yeniden açılmıştır. Bakıcı profil adı panelde değişir; Home/Keşfet ilanındaki ad eski kalır. Sohbet geçmişi bakıcıya göre ayrılır ancak aynı bakıcıyla görüşen farklı sahipler için ayrı konuşma kimliği yoktur. Genel tamamlanma beyanı bu iki açık giderilene kadar geçerli değildir; kayıt `eksiklikler.md` bölüm 7 içindedir.
+## 8. Yeni denetim — Adım 1
+
+İlk adım sonunda **6/50 tamamlandı, 44 açık**; 71 test başarılı ve analiz temiz. Köpek sahipliği ve aktif köpek seçimi hesaba bağlıdır; yeni sahip başka kişinin köpeğini görmez ve boş durumdan ekleme yapar. Bildirim alıcısı/rolü ve olay tarihi kalıcıdır. Her yeni bakıcının kendi kararlı kimliği ve yayınlanmamış ilan taslağı vardır; giriş bu hesabın rolünü ve ilanını geri yükler. İlan bilgileri tamamlanınca taslak kataloğa katılır. İlk kurulumdan sonraki bilinçli boş listeler yeniden demo veriyle doldurulmaz. Eski sahipsiz pet/bildirim kayıtları yeni hesaba atanmaz; eski demo kimliğinde korunur.
+
+
+<!-- audit-progress:start -->
+
+**Yeni denetim güncel durumu: 47/50 tamamlandı, 3 kabul bekliyor. 171 VM testi başarılı; 3 Chrome senaryosu doğrulandı; Flutter analizi temiz.**
+
+Android süreç yeniden oluşturma ve native profile performans kabulü tamamlandı. iOS/macOS kaynak ayarları hazır; bu Linux ortamında cihaz/sandbox kabulü yapılmadı. Yayın sertifikası ayrıca sağlanmalıdır.
+
+Chrome önizleme başlangıcında Hive IndexedDB kullanılır; native fotoğraf kurtarma ve yetim dosya taraması webde çalıştırılmaz.
+
+Ayrıntılı görev/kabul durumu: [eksiklikler.md](../eksiklikler.md).
+
+<!-- audit-progress:end -->

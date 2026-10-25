@@ -29,7 +29,7 @@ Projede backend yoktur. Yerel depolama olarak `Hive` kullanıldığı için **JS
 
 ### 2.2. JSON Kullanımı Yasaktır (Saf Hive Mimarisi)
 - Projede backend olmadığı için `.json` varlık dosyası oluşturulmaz, `dart:convert` ile JSON parse edilmez, modellere gereksiz `fromJson` / `toJson` yazılmaz.
-- Başlangıç (demo) hizmet veren ilanları ve örnek kayıtlar `lib/data/local/hive_seed_data.dart` içinde saf Dart nesneleri olarak tanımlanır ve uygulama ilk açıldığında `Hive` kutuları boşsa doğrudan Hive içine tohumlanır (`seed`).
+- Başlangıç (demo) hizmet veren ilanları ve örnek kayıtlar `lib/data/local/hive_seed_data.dart` içinde saf Dart nesneleri olarak tanımlanır ve ilk kurulumda boş `Hive` kutularına yazılır; `demo_seeded_v1` sonrasında bilinçli boş kutular yeniden tohumlanmaz.
 
 ### 2.3. SOLID, OOP ve Tek Widget (DRY) Prensibi
 - **Single Responsibility (Tek Sorumluluk):** Hiçbir `build` metodu **40 satırı** geçemez (kaynak dosyalarında denetlenir). Uzun ekranlar küçük yardımcı metodlara (`_build...`) veya `widgets/` altında modüler sınıflara bölünür.
@@ -77,3 +77,39 @@ linter:
 - Fotoğraf temizliği yalnız uygulamanın sahip olduğu dizinde yapılır; önce yeni kayıt kalıcılaştırılır, sonra artık kullanılmayan eski dosya ve görsel önbelleği temizlenir.
 - Testler `HiveBoxes.clearFallbackMemory()` ile birbirinden yalıtılır. Kalıcılık testleri geçici gerçek Hive kutularını da kapatıp açar.
 - `flutter analyze`, `flutter test` ve `dart format --output=none --set-exit-if-changed lib test` sonuçları doğrulanmadan tamamlandı beyanı yazılmaz.
+
+
+## 5. Kalıcı Kimlik ve Sohbet Anahtarı Kuralları
+
+- Yeni sahip kimliği görüntülenen ad veya e-postadan türetilmez. E-posta hesap eşlemesi, değişmeyen `ownerId` değerini bulmak içindir; profil güncellemesi kimliği değiştirmez.
+- Sohbet okuma/yazma çağrıları `ownerId` ve `sitterId` değerlerini zorunlu alır. Tek bakıcı anahtarına geri dönüş eklenmez.
+- Profil senkronizasyonu testi yalnız state alanını değil gerçek Home/Keşfet/panel metinlerini kontrol eder. Sohbet testi farklı bakıcıların yanı sıra aynı bakıcıyla görüşen farklı sahipleri, aynı adlı kişileri ve rol değişimini de kapsar.
+- Eski veride muhatap güvenle belirlenemiyorsa mesaj başka bir kişinin konuşmasına kopyalanmaz; aslı arşivde korunur. Geçiş, yeniden çalıştırma ve Hive kapat/aç testleriyle doğrulanır.
+
+## 6. Yeni denetim hesap sınırları
+
+- Pet okuma/yazma aktif `ownerId` kapsamındadır; eksik kimlikte aktif köpeğe fallback yapılmaz.
+- Boş pet state'i `Dog?` olarak ele alınır; kullanıcıya gösterilen sahte profil/sağlık verisi oluşturulmaz.
+- Bildirim okuma, sayaç ve okundu işlemi alıcı kimliği/rolüyle sınırlıdır; zaman metni yerine gerçek olay tarihi tutulur.
+- Yeni bakıcı ayrı kimlik/ilan taslağı alır; profil düzenlemesi hesabın kimliğini değiştirmez.
+- Adım 1 doğrulaması: 10 yeni kalıcı testle toplam 71 başarılı test, temiz analiz. Diğer açık maddeler `eksiklikler.md` içindedir.
+
+
+## Geçmiş ve platform doğrulaması
+
+- Sohbet View kodu `features/chat/` altındadır. Geçmiş okumaları `ConversationRepository` üzerinden asenkron ve sayfalıdır; SettingsRepository içine mesaj listesi ekleme.
+- Bozuk kayıt asıllarını ve legacy arşivini koru. Kalıcı modda açılmayan kutuyu test fallback belleğiyle gizleme.
+- Picker açılmadan işlem/hedef hesap/pet kimliği kalıcılaşır. Geri yükleme seçili petten bağımsız özgün hedefi kullanır; yabancı veya kayıp hedefe dosya yazılmaz.
+- Birim/Hive testi ile Android süreç öldürme, iOS izin akışı, macOS sandbox ve imzalı yayın paketini ayrı raporla. Cihazda yapılmayan kabulü tamamlandı sayma.
+
+<!-- audit-progress:start -->
+
+**Yeni denetim güncel durumu: 47/50 tamamlandı, 3 kabul bekliyor. 171 VM testi başarılı; 3 Chrome senaryosu doğrulandı; Flutter analizi temiz.**
+
+171 test, temiz analiz, biçim ve build boyu kontrolü geçti. Android süreç kaybı ile native profile VM Service/GC, image cache, meminfo ve disk ölçümleri alındı. Apple cihazı/sandbox ve gerçek sertifika sonuçları ayrıca doğrulanmalıdır.
+
+Web başlangıcı için @TestOn(browser) üç kalıcı kontrol eklendi; aynı kontrol fonksiyonları gerçek Chromiumda bağımsız web girişinden çalıştırıldı.
+
+Ayrıntılı görev/kabul durumu: [eksiklikler.md](../eksiklikler.md).
+
+<!-- audit-progress:end -->

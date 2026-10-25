@@ -8,8 +8,13 @@ import 'router/app_shell.dart';
 
 class PawCareApp extends StatefulWidget {
   final bool startWithSplash;
+  final bool respectFirstLaunch;
 
-  const PawCareApp({super.key, this.startWithSplash = false});
+  const PawCareApp({
+    super.key,
+    this.startWithSplash = false,
+    this.respectFirstLaunch = false,
+  });
 
   @override
   State<PawCareApp> createState() => _PawCareAppState();
@@ -23,7 +28,10 @@ class _PawCareAppState extends State<PawCareApp> {
   void initState() {
     super.initState();
     _themeController = ThemeController();
-    _router = AppRouter(startWithSplash: widget.startWithSplash);
+    _router = AppRouter(
+      startWithSplash: widget.startWithSplash,
+      respectFirstLaunch: widget.respectFirstLaunch,
+    );
   }
 
   @override

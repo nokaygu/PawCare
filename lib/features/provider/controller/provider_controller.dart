@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 
 import '../../../app/router/app_router.dart';
 import '../../../core/constants/app_strings.dart';
+import '../../../core/utils/lifecycle_notifier.dart';
 import '../../../data/models/models.dart';
 import '../../../data/repositories/booking_repository.dart';
 import '../../../data/repositories/settings_repository.dart';
@@ -11,20 +12,29 @@ import '../../notifications/controller/notifications_controller.dart';
 @immutable
 class ProviderState {
   final List<BookingRequest> bookings;
-  final SitterListing primarySitter;
+  final SitterListing? _primarySitter;
+  bool get hasListing => _primarySitter != null;
+  SitterListing get primarySitter =>
+      _primarySitter ?? (throw StateError('Listing unavailable'));
   final String sitterDisplayName;
 
-  const ProviderState({
-    required this.bookings,
-    required this.primarySitter,
+  ProviderState({
+    required List<BookingRequest> bookings,
+    required this._primarySitter,
     required this.sitterDisplayName,
-  });
+  }) : bookings = List.unmodifiable(bookings);
 
   List<BookingRequest> get pendingBookings =>
       bookings.where((b) => b.status == BookingStatus.pending).toList();
 
   List<BookingRequest> get confirmedBookings =>
       bookings.where((b) => b.status == BookingStatus.confirmed).toList();
+  List<BookingRequest> get activeAndUpcomingBookings => confirmedBookings
+      .where((booking) => booking.endDate.isAfter(DateTime.now()))
+      .toList();
+  List<BookingRequest> get awaitingCompletion => confirmedBookings
+      .where((booking) => !booking.endDate.isAfter(DateTime.now()))
+      .toList();
 
   double get totalConfirmedEarnings {
     final now = DateTime.now();
@@ -43,19 +53,21 @@ class ProviderState {
   }) {
     return ProviderState(
       bookings: bookings ?? this.bookings,
-      primarySitter: primarySitter ?? this.primarySitter,
+      primarySitter: primarySitter ?? _primarySitter,
       sitterDisplayName: sitterDisplayName ?? this.sitterDisplayName,
     );
   }
 }
 
-class ProviderController extends ValueNotifier<ProviderState> {
+class ProviderController extends LifecycleNotifier<ProviderState> {
   final BookingRepository _bookingRepository;
   final SitterRepository _sitterRepository;
   final SettingsRepository _settingsRepository;
   final AppRouter router;
   final NotificationsController? notificationsController;
   final VoidCallback? onBookingsChanged;
+  final VoidCallback? onListingsChanged;
+  String? lastWarning;
 
   ProviderController({
     required this.router,
@@ -64,17 +76,21 @@ class ProviderController extends ValueNotifier<ProviderState> {
     SettingsRepository? settingsRepository,
     this.notificationsController,
     this.onBookingsChanged,
-  }) : _bookingRepository = bookingRepository ?? const BookingRepository(),
+    this.onListingsChanged,
+  }) : _bookingRepository = bookingRepository ?? BookingRepository(),
        _sitterRepository = sitterRepository ?? const SitterRepository(),
        _settingsRepository = settingsRepository ?? const SettingsRepository(),
        super(
          ProviderState(
            bookings: _loadBookings(
-             bookingRepository ?? const BookingRepository(),
+             bookingRepository ?? BookingRepository(),
              settingsRepository ?? const SettingsRepository(),
            ),
            primarySitter: (sitterRepository ?? const SitterRepository())
-               .getPrimarySitter(),
+               .getById(
+                 (settingsRepository ?? const SettingsRepository())
+                     .getActiveSitterId(),
+               ),
            sitterDisplayName: (settingsRepository ?? const SettingsRepository())
                .getSitterName(),
          ),
@@ -94,7 +110,25 @@ class ProviderController extends ValueNotifier<ProviderState> {
   void refresh() {
     value = ProviderState(
       bookings: _loadBookings(_bookingRepository, _settingsRepository),
-      primarySitter: _sitterRepository.getPrimarySitter(),
+      primarySitter: _sitterRepository.getById(
+        _settingsRepository.getActiveSitterId(),
+      ),
+      sitterDisplayName: _settingsRepository.getSitterName(),
+    );
+  }
+
+  void refreshBookings() {
+    value = value.copyWith(
+      bookings: _loadBookings(_bookingRepository, _settingsRepository),
+    );
+  }
+
+  void refreshListing() {
+    value = ProviderState(
+      bookings: value.bookings,
+      primarySitter: _sitterRepository.getById(
+        _settingsRepository.getActiveSitterId(),
+      ),
       sitterDisplayName: _settingsRepository.getSitterName(),
     );
   }
@@ -108,22 +142,37 @@ class ProviderController extends ValueNotifier<ProviderState> {
     BookingStatus newStatus,
   ) async {
     if (booking.sitterId != _settingsRepository.getActiveSitterId()) return;
-    await _bookingRepository.updateBookingStatus(booking.id, newStatus);
-    refresh();
-    onBookingsChanged?.call();
+    await runExclusive(() async {
+      lastWarning = null;
+      final updated = await _bookingRepository.updateBookingStatus(
+        booking.id,
+        newStatus,
+      );
+      refresh();
+      onBookingsChanged?.call();
 
-    final statusWord = newStatus == BookingStatus.confirmed
-        ? AppStrings.statusWordApproved
-        : AppStrings.statusWordRejected;
-    await notificationsController?.addNotification(
-      title: AppStrings.notifBookingStatusUpdatedTitle,
-      message: AppStrings.notifBookingStatusUpdatedBody(
-        booking.petName,
-        booking.serviceTitle,
-        statusWord,
-      ),
-      type: NotificationType.bookingStatusChanged,
-    );
+      final statusWord = switch (newStatus) {
+        BookingStatus.confirmed => AppStrings.statusWordApproved,
+        BookingStatus.completed => AppStrings.statusWordCompleted,
+        _ => AppStrings.statusWordRejected,
+      };
+      try {
+        await notificationsController?.addNotification(
+          title: AppStrings.notifBookingStatusUpdatedTitle,
+          message: AppStrings.notifBookingStatusUpdatedBody(
+            updated.petName,
+            updated.serviceTitle,
+            statusWord,
+          ),
+          type: NotificationType.bookingStatusChanged,
+          recipientId: updated.ownerId,
+          recipientRole: UserRole.owner,
+          relatedRecordId: booking.id,
+        );
+      } catch (_) {
+        lastWarning = AppStrings.notificationDeliveryFailed;
+      }
+    });
   }
 
   Future<void> updateListingDetails({
@@ -131,34 +180,25 @@ class ProviderController extends ValueNotifier<ProviderState> {
     required String location,
     required double pricePerUnit,
     required String bio,
+    int? capacity,
   }) async {
-    final current = value.primarySitter;
-    final updated = current.copyWith(
-      facilityTitle: facilityTitle.trim().isEmpty
-          ? current.facilityTitle
-          : facilityTitle.trim(),
-      location: location.trim().isEmpty ? current.location : location.trim(),
-      pricePerUnit: pricePerUnit <= 0 ? current.pricePerUnit : pricePerUnit,
-      bio: bio.trim().isEmpty ? current.bio : bio.trim(),
-    );
-    await _sitterRepository.saveSitter(updated);
-    refresh();
-    onBookingsChanged?.call();
+    await runExclusive(() async {
+      await _sitterRepository.updateDetails(
+        sitterId: value.primarySitter.id,
+        facilityTitle: facilityTitle,
+        location: location,
+        pricePerUnit: pricePerUnit,
+        bio: bio,
+        capacity: capacity,
+      );
+      refresh();
+      (onListingsChanged ?? onBookingsChanged)?.call();
+    });
   }
 
   Future<void> toggleUnavailableDate(DateTime date) async {
-    final current = List<DateTime>.from(value.primarySitter.unavailableDates);
-    final idx = current.indexWhere(
-      (d) => d.year == date.year && d.month == date.month && d.day == date.day,
-    );
-    if (idx != -1) {
-      current.removeAt(idx);
-    } else {
-      current.add(date);
-    }
-    final updated = value.primarySitter.copyWith(unavailableDates: current);
-    await _sitterRepository.saveSitter(updated);
+    await _sitterRepository.toggleUnavailableDate(value.primarySitter.id, date);
     refresh();
-    onBookingsChanged?.call();
+    (onListingsChanged ?? onBookingsChanged)?.call();
   }
 }

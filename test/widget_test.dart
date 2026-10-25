@@ -12,7 +12,7 @@ void main() {
   setUp(HiveBoxes.clearFallbackMemory);
   tearDown(HiveBoxes.clearFallbackMemory);
   test('Domain models serialize and deserialize via toMap and fromMap', () {
-    const dog = HiveSeedData.initialDog;
+    final dog = HiveSeedData.initialDog;
     final dogRestored = Dog.fromMap(dog.toMap());
     expect(dogRestored.id, dog.id);
     expect(dogRestored.name, 'Barley');
@@ -40,7 +40,7 @@ void main() {
 
   test('Repositories persist and update state properly', () async {
     const dogRepo = DogRepository();
-    const bookingRepo = BookingRepository();
+    final bookingRepo = BookingRepository();
     const settingsRepo = SettingsRepository();
 
     final initialDog = dogRepo.getCurrentDog();
@@ -55,6 +55,14 @@ void main() {
     await bookingRepo.addBooking(
       BookingRequest(
         id: 'test_book_99',
+        ownerId: settingsRepo.getOwnerId(),
+        ownerName: settingsRepo.getOwnerName(),
+        petId: initialDog.id,
+        serviceType: ServiceType.hotel,
+        units: 2,
+        unitPriceCents: 45000,
+        serviceFeeCents: 5000,
+        createdAt: DateTime(2026, 10, 23),
         sitterId: 'sitter_1',
         sitterName: 'Ayşe Yılmaz',
         sitterPhoto: 'assets/images/ayse.jpg',

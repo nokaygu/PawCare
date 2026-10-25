@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../core/constants/app_dimens.dart';
 import '../../../core/constants/app_strings.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/widgets/async_action_builder.dart';
 import '../controller/profile_controller.dart';
 
 class EditUserProfileModal extends StatefulWidget {
@@ -53,10 +54,16 @@ class _EditUserProfileModalState extends State<EditUserProfileModal> {
         name: _nameCtrl.text,
         email: _emailCtrl.text,
       );
-    } on ArgumentError {
+    } on ArgumentError catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text(AppStrings.profileEmailInUse)),
+        SnackBar(
+          content: Text(
+            error.message == AppStrings.invalidEmail
+                ? AppStrings.invalidEmail
+                : AppStrings.profileEmailInUse,
+          ),
+        ),
       );
       return;
     }
@@ -72,13 +79,16 @@ class _EditUserProfileModalState extends State<EditUserProfileModal> {
       onPressed: () => Navigator.of(context).pop(),
       child: Text(AppStrings.cancel, style: textTheme.bodyLarge),
     ),
-    ElevatedButton(
-      onPressed: _save,
-      style: ElevatedButton.styleFrom(
-        backgroundColor: colors.primary,
-        foregroundColor: colors.onPrimary,
+    AsyncActionBuilder(
+      action: _save,
+      builder: (_, save, busy) => ElevatedButton(
+        onPressed: save,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: colors.primary,
+          foregroundColor: colors.onPrimary,
+        ),
+        child: Text(busy ? AppStrings.saving : AppStrings.save),
       ),
-      child: const Text(AppStrings.save),
     ),
   ];
 

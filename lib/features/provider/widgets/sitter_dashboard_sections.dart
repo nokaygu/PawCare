@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/constants/app_dimens.dart';
+import '../../../core/widgets/paw_paged_list.dart';
 import '../../../core/constants/app_strings.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/app_typography.dart';
-import '../../../core/widgets/modals/call_modal.dart';
-import '../../../core/widgets/modals/chat_modal.dart';
+import '../../chat/view/chat_modal.dart';
 import '../../../core/widgets/paw_avatar_image.dart';
 import '../../../core/widgets/paw_header_actions.dart';
 import '../../../data/models/models.dart';
@@ -13,6 +13,8 @@ import '../../../data/models/models.dart';
 class SitterProfileHeader extends StatelessWidget {
   final String sitterName;
   final String facilityTitle;
+  final String photoPath;
+  final bool isVerified;
   final VoidCallback onSwitchToOwner;
   final int unreadNotifications;
   final VoidCallback onNotificationsTap;
@@ -21,6 +23,8 @@ class SitterProfileHeader extends StatelessWidget {
     super.key,
     required this.sitterName,
     required this.facilityTitle,
+    this.photoPath = '',
+    this.isVerified = false,
     required this.onSwitchToOwner,
     required this.unreadNotifications,
     required this.onNotificationsTap,
@@ -63,6 +67,8 @@ class SitterProfileHeader extends StatelessWidget {
           child: _SitterAvatarIdentityRow(
             sitterName: sitterName,
             facilityTitle: facilityTitle,
+            photoPath: photoPath,
+            isVerified: isVerified,
           ),
         ),
         _switchRoleButton(colors, textTheme),
@@ -79,10 +85,14 @@ class SitterProfileHeader extends StatelessWidget {
 class _SitterAvatarIdentityRow extends StatelessWidget {
   final String sitterName;
   final String facilityTitle;
+  final String photoPath;
+  final bool isVerified;
 
   const _SitterAvatarIdentityRow({
     required this.sitterName,
     required this.facilityTitle,
+    this.photoPath = '',
+    this.isVerified = false,
   });
 
   Widget _nameVerifiedRow(ColorScheme colors, TextTheme textTheme) {
@@ -96,7 +106,8 @@ class _SitterAvatarIdentityRow extends StatelessWidget {
           ),
         ),
         const SizedBox(width: AppDimens.p4),
-        Icon(Icons.verified, size: AppDimens.iconXs, color: colors.primary),
+        if (isVerified)
+          Icon(Icons.verified, size: AppDimens.iconXs, color: colors.primary),
       ],
     );
   }
@@ -107,9 +118,13 @@ class _SitterAvatarIdentityRow extends StatelessWidget {
     final textTheme = context.pawTextTheme;
     return Row(
       children: <Widget>[
-        const CircleAvatar(
+        CircleAvatar(
           radius: AppDimens.avatarRadiusXl,
-          backgroundImage: AssetImage('assets/images/ayse.jpg'),
+          backgroundImage: PawImageProvider.avatar(
+            context,
+            photoPath,
+            radius: AppDimens.avatarRadiusXl,
+          ),
         ),
         const SizedBox(width: AppDimens.p12),
         Expanded(
@@ -309,8 +324,8 @@ class EmptyPendingRequestsCard extends StatelessWidget {
 
 class PendingBookingRequestCard extends StatelessWidget {
   final BookingRequest booking;
-  final VoidCallback onReject;
-  final VoidCallback onApprove;
+  final VoidCallback? onReject;
+  final VoidCallback? onApprove;
 
   const PendingBookingRequestCard({
     super.key,
@@ -364,7 +379,11 @@ class _PendingRequestTopRow extends StatelessWidget {
       children: <Widget>[
         CircleAvatar(
           radius: AppDimens.avatarRadiusMd,
-          backgroundImage: PawImageProvider.resolve(booking.petPhotoPath),
+          backgroundImage: PawImageProvider.avatar(
+            context,
+            booking.petPhotoPath,
+            radius: AppDimens.avatarRadiusMd,
+          ),
         ),
         const SizedBox(width: AppDimens.p12),
         Expanded(
@@ -437,19 +456,17 @@ class _PendingRequestNotesBox extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          Row(
-            children: <Widget>[
-              Icon(
-                Icons.calendar_month,
-                size: AppDimens.iconXs,
-                color: colors.primary,
-              ),
-              const SizedBox(width: AppDimens.p6),
-              Expanded(
-                child: Text(booking.serviceTitle, style: textTheme.bodyLarge),
-              ),
-            ],
+          Text(
+            AppStrings.bookingPeriod(
+              booking.startDate,
+              booking.endDate,
+              hourly: booking.serviceType == ServiceType.walk,
+              dayCare: booking.serviceType == ServiceType.dayCare,
+            ),
+            style: textTheme.titleSmall,
           ),
+          const SizedBox(height: AppDimens.p6),
+          _buildServiceTitle(context),
           const SizedBox(height: AppDimens.p6),
           Text(
             AppStrings.careNotesPrefix(booking.careNotes),
@@ -461,12 +478,29 @@ class _PendingRequestNotesBox extends StatelessWidget {
       ),
     );
   }
+
+  Widget _buildServiceTitle(BuildContext context) {
+    final colors = context.colors;
+    final textTheme = context.pawTextTheme;
+
+    return Row(
+      children: <Widget>[
+        Icon(
+          Icons.calendar_month,
+          size: AppDimens.iconXs,
+          color: colors.primary,
+        ),
+        const SizedBox(width: AppDimens.p6),
+        Expanded(child: Text(booking.serviceTitle, style: textTheme.bodyLarge)),
+      ],
+    );
+  }
 }
 
 class _PendingRequestActionButtons extends StatelessWidget {
   final BookingRequest booking;
-  final VoidCallback onReject;
-  final VoidCallback onApprove;
+  final VoidCallback? onReject;
+  final VoidCallback? onApprove;
 
   const _PendingRequestActionButtons({
     required this.booking,
@@ -568,17 +602,32 @@ class _MessageOwnerTextButton extends StatelessWidget {
 
 class ActiveGuestCardSection extends StatelessWidget {
   final List<BookingRequest> confirmedBookings;
+  final String title;
+  final ValueChanged<BookingRequest>? onComplete;
 
   const ActiveGuestCardSection({
     super.key,
     this.confirmedBookings = const <BookingRequest>[],
+    this.title = AppStrings.activeAndUpcomingGuestsTitle,
+    this.onComplete,
   });
 
   Widget _guestCard(BuildContext context, BookingRequest booking) {
     return Container(
       padding: const EdgeInsets.all(AppDimens.p16),
       decoration: _guestCardDecoration(context),
-      child: _ActiveGuestRow(booking: booking),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _ActiveGuestRow(booking: booking),
+          if (onComplete != null)
+            TextButton.icon(
+              onPressed: () => onComplete!(booking),
+              icon: const Icon(Icons.check_circle_outline),
+              label: const Text(AppStrings.completeService),
+            ),
+        ],
+      ),
     );
   }
 
@@ -587,17 +636,13 @@ class ActiveGuestCardSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
-        Text(
-          AppStrings.activeAndUpcomingGuestsTitle,
-          style: context.pawTextTheme.titleLarge,
-        ),
+        Text(title, style: context.pawTextTheme.titleLarge),
         const SizedBox(height: AppDimens.p12),
         if (confirmedBookings.isEmpty)
           const _EmptyActiveGuestsCard()
         else
-          ListView.separated(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
+          PawPagedList(
+            storageId: 'provider_guests_$title',
             itemCount: confirmedBookings.length,
             separatorBuilder: (_, _) => const SizedBox(height: AppDimens.p12),
             itemBuilder: (context, index) =>
@@ -661,7 +706,11 @@ class _ActiveGuestRow extends StatelessWidget {
       children: <Widget>[
         CircleAvatar(
           radius: AppDimens.avatarRadiusLg,
-          backgroundImage: PawImageProvider.resolve(booking.petPhotoPath),
+          backgroundImage: PawImageProvider.avatar(
+            context,
+            booking.petPhotoPath,
+            radius: AppDimens.avatarRadiusLg,
+          ),
         ),
         const SizedBox(width: AppDimens.p14),
         Expanded(child: _ActiveGuestInfo(booking: booking)),
@@ -729,15 +778,8 @@ class _ActiveGuestActionIcons extends StatelessWidget {
   Widget _callButton(BuildContext context) {
     return IconButton(
       icon: Icon(Icons.phone_outlined, color: context.colors.primary),
-      onPressed: () => CallModal.show(
-        context,
-        contactName: AppStrings.contactWithPet(
-          booking.ownerName,
-          booking.petName,
-        ),
-        roleSubtitle: AppStrings.registeredContactSubtitle,
-        phoneNumber: AppStrings.defaultOwnerPhone,
-      ),
+      tooltip: AppStrings.phoneNotProvided,
+      onPressed: null,
       style: IconButton.styleFrom(
         backgroundColor: context.pawTheme.surfaceContainerLow,
         shape: const CircleBorder(),

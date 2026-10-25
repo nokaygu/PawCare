@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/constants/app_dimens.dart';
+import '../../../core/widgets/async_action_builder.dart';
 import '../../../core/constants/app_strings.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/theme_controller.dart';
@@ -81,7 +82,11 @@ class _ProfileSummaryAvatar extends StatelessWidget {
     if (avatarPath != null) {
       return CircleAvatar(
         radius: AppDimens.avatarRadiusProfile,
-        backgroundImage: PawImageProvider.resolve(avatarPath!),
+        backgroundImage: PawImageProvider.avatar(
+          context,
+          avatarPath!,
+          radius: AppDimens.avatarRadiusProfile,
+        ),
       );
     }
     return CircleAvatar(
@@ -107,7 +112,12 @@ class ProfileThemeSelectorCard extends StatelessWidget {
       valueListenable: themeController,
       builder: (context, mode, _) => _ThemeSelectorRow(
         isDark: mode == ThemeMode.dark,
-        onChanged: themeController.setDarkMode,
+        onChanged: themeController.isBusy
+            ? null
+            : (isDark) => performUiAction(
+                context,
+                () => themeController.setDarkMode(isDark),
+              ),
       ),
     );
   }
@@ -115,7 +125,7 @@ class ProfileThemeSelectorCard extends StatelessWidget {
 
 class _ThemeSelectorRow extends StatelessWidget {
   final bool isDark;
-  final ValueChanged<bool> onChanged;
+  final ValueChanged<bool>? onChanged;
 
   const _ThemeSelectorRow({required this.isDark, required this.onChanged});
 

@@ -34,6 +34,11 @@ class PawStatusBadge extends StatelessWidget {
         colors.onSurfaceVariant,
         AppStrings.statusCompleted,
       ),
+      BookingStatus.cancelled => (
+        pawTheme.surfaceContainerLow,
+        colors.onSurfaceVariant,
+        AppStrings.statusCancelled,
+      ),
     };
   }
 

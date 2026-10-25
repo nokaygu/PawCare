@@ -1,81 +1,158 @@
-import 'package:flutter/foundation.dart';
+import 'dart:async';
 
 import '../../../app/router/app_router.dart';
 import '../../../core/constants/app_strings.dart';
+import '../../../core/utils/lifecycle_notifier.dart';
 import '../../../data/models/models.dart';
+import '../../../data/models/home_state.dart';
 import '../../../data/repositories/booking_repository.dart';
+import '../../../data/repositories/dog_repository.dart';
 import '../../../data/repositories/settings_repository.dart';
 import '../../../data/repositories/sitter_repository.dart';
+import '../../pets/controller/pets_controller.dart';
 
-class HomeController extends ValueNotifier<List<SitterListing>> {
+class HomeController extends LifecycleNotifier<HomeState> {
   final SitterRepository _sitterRepository;
   final BookingRepository _bookingRepository;
   final SettingsRepository _settingsRepository;
+  final PetsController? _petsController;
+  final DateTime Function() _now;
   final AppRouter router;
-  List<BookingRequest> _bookings = const <BookingRequest>[];
+  List<BookingRequest> _bookings = const [];
+  List<SitterListing> _featured = const [];
   String _ownerFirstName = AppStrings.defaultOwnerFallbackName;
+  Timer? _boundaryTimer;
 
   HomeController({
     required this.router,
     SitterRepository? sitterRepository,
     BookingRepository? bookingRepository,
     SettingsRepository? settingsRepository,
+    this._petsController,
+    DateTime Function()? now,
   }) : _sitterRepository = sitterRepository ?? const SitterRepository(),
-       _bookingRepository = bookingRepository ?? const BookingRepository(),
+       _bookingRepository = bookingRepository ?? BookingRepository(),
        _settingsRepository = settingsRepository ?? const SettingsRepository(),
-       super((sitterRepository ?? const SitterRepository()).getAllSitters()) {
-    _refreshContext();
+       _now = now ?? DateTime.now,
+       super(
+         HomeState(
+           ownerFirstName: AppStrings.defaultOwnerFallbackName,
+           evaluatedAt: (now ?? DateTime.now)(),
+         ),
+       ) {
+    refreshSitters();
+    _petsController?.addListener(refreshTime);
   }
 
-  String get ownerFirstName => _ownerFirstName;
+  String get ownerFirstName => value.ownerFirstName;
+  BookingRequest? get activeConfirmedBooking => value.activeBooking;
 
-  void _refreshContext() {
-    final full = _settingsRepository.getOwnerName().trim();
-    _ownerFirstName = full.isEmpty
+  void refreshOwner() {
+    final name = _settingsRepository.getOwnerName().trim();
+    _ownerFirstName = name.isEmpty
         ? AppStrings.defaultOwnerFallbackName
-        : full.split(' ').first;
-    final ownerId = _settingsRepository.getOwnerId();
-    _bookings = List<BookingRequest>.unmodifiable(
-      _bookingRepository.getAllBookings().where(
-        (booking) => booking.ownerId == ownerId,
-      ),
-    );
+        : name.split(' ').first;
+    refreshTime();
   }
 
-  BookingRequest? get activeConfirmedBooking {
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    return _bookings.where((booking) {
-      final start = DateTime(
-        booking.startDate.year,
-        booking.startDate.month,
-        booking.startDate.day,
-      );
-      final end = DateTime(
-        booking.endDate.year,
-        booking.endDate.month,
-        booking.endDate.day,
-      );
-      return booking.status == BookingStatus.confirmed &&
-          !today.isBefore(start) &&
-          !today.isAfter(end);
-    }).firstOrNull;
+  void refreshBookings() {
+    final ownerId = _settingsRepository.getOwnerId();
+    _bookings = _bookingRepository
+        .getAllBookings()
+        .where((b) => b.ownerId == ownerId)
+        .toList();
+    refreshOwner();
+  }
+
+  void _loadCatalog() {
+    final listings = List<SitterListing>.of(_sitterRepository.getAllSitters())
+      ..sort((a, b) {
+        final rating = b.rating.compareTo(a.rating);
+        return rating == 0 ? a.id.compareTo(b.id) : rating;
+      });
+    _featured = List.unmodifiable(listings.take(3));
   }
 
   void refreshSitters() {
-    _refreshContext();
-    value = List<SitterListing>.from(_sitterRepository.getAllSitters());
+    _loadCatalog();
+    refreshBookings();
   }
 
-  Future<void> switchToSitterMode() async {
-    await router.setRole(UserRole.sitter);
+  void refreshListings() {
+    _loadCatalog();
+    refreshTime();
   }
 
-  void openPetProfileTab() {
-    router.setOwnerNavIndex(2);
+  void refreshTime() {
+    if (isDisposed) return;
+    final now = _now();
+    final ownerId = _settingsRepository.getOwnerId();
+    final pet = _petsController == null
+        ? const DogRepository().findCurrentDog()
+        : _petsController.value;
+    final selected = pet?.ownerId == ownerId ? pet : null;
+    final records =
+        _bookings
+            .where(
+              (b) =>
+                  b.ownerId == ownerId &&
+                  selected != null &&
+                  b.petId == selected.id,
+            )
+            .toList()
+          ..sort((a, b) => a.startDate.compareTo(b.startDate));
+    final active = records.where((b) => b.isActiveAt(now)).toList()
+      ..sort((a, b) => a.endDate.compareTo(b.endDate));
+    final next = records
+        .where(
+          (b) =>
+              b.status == BookingStatus.confirmed && b.startDate.isAfter(now),
+        )
+        .toList();
+    value = HomeState(
+      ownerFirstName: _ownerFirstName,
+      selectedDog: selected,
+      evaluatedAt: now,
+      featuredSitters: _featured,
+      activeBooking: active.firstOrNull,
+      nextBooking: next.firstOrNull,
+      pendingCount: records
+          .where((b) => b.status == BookingStatus.pending)
+          .length,
+      otherBookingCount: (active.length + next.length - 1).clamp(
+        0,
+        records.length,
+      ),
+    );
+    _scheduleBoundary(now);
   }
 
-  void openExploreTab() {
-    router.setOwnerNavIndex(1);
+  void _scheduleBoundary(DateTime now) {
+    _boundaryTimer?.cancel();
+    var next = DateTime(now.year, now.month, now.day + 1);
+    for (final booking in _bookings) {
+      for (final boundary in [booking.startDate, booking.endDate]) {
+        if (boundary.isAfter(now) && boundary.isBefore(next)) next = boundary;
+      }
+    }
+    _boundaryTimer = Timer(
+      next.difference(now) + const Duration(milliseconds: 10),
+      () {
+        if (isDisposed) return;
+        _petsController?.refreshTime();
+        refreshTime();
+      },
+    );
+  }
+
+  Future<void> switchToSitterMode() => router.setRole(UserRole.sitter);
+  void openExploreTab() => router.setOwnerNavIndex(1);
+  void openBookingsTab() => router.setOwnerNavIndex(3);
+
+  @override
+  void dispose() {
+    _boundaryTimer?.cancel();
+    _petsController?.removeListener(refreshTime);
+    super.dispose();
   }
 }

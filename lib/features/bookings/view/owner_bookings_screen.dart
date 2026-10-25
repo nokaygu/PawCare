@@ -4,6 +4,7 @@ import '../../../core/constants/app_dimens.dart';
 import '../../../core/constants/app_strings.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/paw_header_actions.dart';
+import '../../../core/widgets/async_action_builder.dart';
 import '../../../data/models/models.dart';
 import '../controller/bookings_controller.dart';
 import '../widgets/owner_booking_card.dart';
@@ -30,17 +31,11 @@ class OwnerBookingsScreen extends StatelessWidget {
         child: ValueListenableBuilder<List<BookingRequest>>(
           valueListenable: controller,
           builder: (context, bookings, _) {
-            return SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(
-                horizontal: AppDimens.paddingLg,
-                vertical: AppDimens.paddingLg,
-              ),
-              child: _OwnerBookingsBody(
-                bookings: bookings,
-                controller: controller,
-                unreadNotifications: unreadNotifications,
-                onNotificationsTap: onNotificationsTap,
-              ),
+            return _OwnerBookingsBody(
+              bookings: bookings,
+              controller: controller,
+              unreadNotifications: unreadNotifications,
+              onNotificationsTap: onNotificationsTap,
             );
           },
         ),
@@ -64,41 +59,58 @@ class _OwnerBookingsBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final pawTheme = context.pawTheme;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: <Widget>[
-        _OwnerBookingsTopBar(
-          unreadNotifications: unreadNotifications,
-          onNotificationsTap: onNotificationsTap,
-        ),
-        const SizedBox(height: AppDimens.p20),
-        if (bookings.isEmpty)
-          Container(
-            padding: const EdgeInsets.all(AppDimens.paddingXl),
-            decoration: BoxDecoration(
-              color: pawTheme.surfaceContainerLowest,
-              borderRadius: BorderRadius.circular(AppDimens.cardRadius),
+    return CustomScrollView(
+      key: const PageStorageKey('owner_bookings_scroll'),
+      slivers: [
+        SliverPadding(
+          padding: const EdgeInsets.all(AppDimens.paddingLg),
+          sliver: SliverToBoxAdapter(
+            child: _OwnerBookingsTopBar(
+              unreadNotifications: unreadNotifications,
+              onNotificationsTap: onNotificationsTap,
             ),
-            child: const Center(child: Text(AppStrings.noBookingsYet)),
-          )
-        else
-          ListView.separated(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: bookings.length,
-            separatorBuilder: (_, _) => const SizedBox(height: AppDimens.p14),
-            itemBuilder: (context, index) {
-              final item = bookings[index];
-              return OwnerBookingCard(
-                booking: item,
-                onCancel: item.status == BookingStatus.pending
-                    ? () => controller.cancelBooking(item)
-                    : null,
-              );
-            },
           ),
+        ),
+        _buildHistorySliver(context),
+        const SliverToBoxAdapter(child: SizedBox(height: AppDimens.p20)),
       ],
+    );
+  }
+
+  Widget _buildHistorySliver(BuildContext context) {
+    final pawTheme = context.pawTheme;
+
+    return SliverPadding(
+      padding: const EdgeInsets.symmetric(horizontal: AppDimens.paddingLg),
+      sliver: bookings.isEmpty
+          ? SliverToBoxAdapter(
+              child: Container(
+                padding: const EdgeInsets.all(AppDimens.paddingXl),
+                decoration: BoxDecoration(
+                  color: pawTheme.surfaceContainerLowest,
+                  borderRadius: BorderRadius.circular(AppDimens.cardRadius),
+                ),
+                child: const Center(child: Text(AppStrings.noBookingsYet)),
+              ),
+            )
+          : SliverList.separated(
+              itemCount: bookings.length,
+              separatorBuilder: (_, _) => const SizedBox(height: AppDimens.p14),
+              itemBuilder: (context, index) {
+                final item = bookings[index];
+                return OwnerBookingCard(
+                  booking: item,
+                  onCancel:
+                      !controller.isBusy && item.canCancelAt(DateTime.now())
+                      ? () => performUiAction(
+                          context,
+                          () => controller.cancelBooking(item),
+                          warning: () => controller.lastWarning,
+                        )
+                      : null,
+                );
+              },
+            ),
     );
   }
 }

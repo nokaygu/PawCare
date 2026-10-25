@@ -4,6 +4,7 @@ import '../../../app/router/app_router.dart';
 import '../../../core/constants/app_dimens.dart';
 import '../../../core/constants/app_strings.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/widgets/async_action_builder.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../data/models/models.dart';
 import '../controller/auth_controller.dart';
@@ -134,7 +135,7 @@ class _SignUpBody extends StatelessWidget {
   final TextEditingController emailController;
   final TextEditingController passwordController;
   final TextEditingController confirmPasswordController;
-  final VoidCallback onSubmit;
+  final Future<void> Function() onSubmit;
   final AppRouter router;
 
   const _SignUpBody({
@@ -191,7 +192,7 @@ class _SignUpBody extends StatelessWidget {
 }
 
 class _SignUpSubmitButton extends StatelessWidget {
-  final VoidCallback onSubmit;
+  final Future<void> Function() onSubmit;
 
   const _SignUpSubmitButton({required this.onSubmit});
 
@@ -202,19 +203,22 @@ class _SignUpSubmitButton extends StatelessWidget {
     return SizedBox(
       width: double.infinity,
       height: AppDimens.buttonHeight,
-      child: ElevatedButton(
-        onPressed: onSubmit,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: colors.primary,
-          foregroundColor: colors.onPrimary,
-          elevation: AppDimens.zero,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppDimens.radiusLg),
+      child: AsyncActionBuilder(
+        action: onSubmit,
+        builder: (_, run, busy) => ElevatedButton(
+          onPressed: run,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: colors.primary,
+            foregroundColor: colors.onPrimary,
+            elevation: AppDimens.zero,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(AppDimens.radiusLg),
+            ),
           ),
-        ),
-        child: Text(
-          AppStrings.createAccountButton,
-          style: textTheme.titleMedium?.copyWith(color: colors.onPrimary),
+          child: Text(
+            busy ? AppStrings.saving : AppStrings.createAccountButton,
+            style: textTheme.titleMedium?.copyWith(color: colors.onPrimary),
+          ),
         ),
       ),
     );

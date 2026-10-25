@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../../core/constants/app_dimens.dart';
@@ -6,8 +8,13 @@ import '../widgets/splash_logo_badge.dart';
 
 class SplashScreen extends StatefulWidget {
   final VoidCallback onFinished;
+  final bool autoFinish;
 
-  const SplashScreen({super.key, required this.onFinished});
+  const SplashScreen({
+    super.key,
+    required this.onFinished,
+    this.autoFinish = true,
+  });
 
   @override
   State<SplashScreen> createState() => _SplashScreenState();
@@ -16,6 +23,7 @@ class SplashScreen extends StatefulWidget {
 class _SplashScreenState extends State<SplashScreen>
     with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
+  Timer? _finishTimer;
   late final Animation<double> _scaleAnimation;
 
   @override
@@ -25,6 +33,11 @@ class _SplashScreenState extends State<SplashScreen>
       vsync: this,
       duration: const Duration(milliseconds: 900),
     )..repeat(reverse: true);
+    if (widget.autoFinish) {
+      _finishTimer = Timer(const Duration(milliseconds: 1100), () {
+        if (mounted) widget.onFinished();
+      });
+    }
     _scaleAnimation = Tween<double>(
       begin: 0.94,
       end: 1.04,
@@ -33,6 +46,7 @@ class _SplashScreenState extends State<SplashScreen>
 
   @override
   void dispose() {
+    _finishTimer?.cancel();
     _controller.dispose();
     super.dispose();
   }

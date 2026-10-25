@@ -5,6 +5,7 @@ import 'package:paw_care/app/router/app_shell.dart';
 import 'package:paw_care/core/theme/app_theme.dart';
 import 'package:paw_care/core/theme/theme_controller.dart';
 import 'package:paw_care/data/local/hive_boxes.dart';
+import 'package:paw_care/data/local/hive_seed_data.dart';
 import 'package:paw_care/data/models/models.dart';
 import 'package:paw_care/data/repositories/booking_repository.dart';
 import 'package:paw_care/data/repositories/dog_repository.dart';
@@ -17,7 +18,14 @@ import 'package:paw_care/features/discovery/view/explore_screen.dart';
 import 'package:paw_care/features/home/view/owner_home_screen.dart';
 import 'package:paw_care/features/provider/view/sitter_dashboard_screen.dart';
 
-Future<BookingRequest> _submitBooking(DiscoveryController discovery) {
+Future<BookingRequest> _submitBooking(DiscoveryController discovery) async {
+  const dogs = DogRepository();
+  final ownerId = const SettingsRepository().getOwnerId();
+  if (dogs.getAllDogs().isEmpty) {
+    await dogs.saveDog(
+      HiveSeedData.initialDog.copyWith(id: 'pet_$ownerId', ownerId: ownerId),
+    );
+  }
   final now = DateTime.now();
   final start = DateTime(now.year, now.month, now.day);
   return discovery.submitBookingRequest(
@@ -108,7 +116,7 @@ void main() {
       expect(requestsB.value, isEmpty);
       await requestsB.cancelBooking(first);
       expect(
-        const BookingRepository()
+        BookingRepository()
             .getAllBookings()
             .firstWhere((booking) => booking.id == first.id)
             .status,

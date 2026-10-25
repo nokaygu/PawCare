@@ -1,7 +1,8 @@
+import 'package:paw_care/data/repositories/conversation_repository.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:paw_care/core/theme/app_theme.dart';
-import 'package:paw_care/core/widgets/modals/chat_modal.dart';
+import 'package:paw_care/features/chat/view/chat_modal.dart';
 import 'package:paw_care/data/local/hive_boxes.dart';
 import 'package:paw_care/data/models/models.dart';
 import 'package:paw_care/data/repositories/settings_repository.dart';
@@ -18,25 +19,29 @@ void main() {
     final ownerId = repository.getOwnerId();
     const message = 'Sohbet rolü doğrulaması';
     await repository.setUserRole(UserRole.sitter);
-    await repository.setActiveSitterId(sitterId);
-    await repository.setSitterName('Test Bakıcı');
+    await repository.activateSitter(
+      sitterId: sitterId,
+      name: 'Test Bakıcı',
+      email: 'chat_sitter@example.com',
+    );
     await _mountChat(tester, sitterId);
 
     await tester.enterText(find.byType(TextField), message);
     await tester.tap(find.byIcon(Icons.send_rounded));
     await tester.pumpAndSettle();
 
-    final saved = repository
-        .getChatMessages(ownerId: ownerId, sitterId: sitterId)
-        .single;
+    final saved = (await const ConversationRepository().readAll(
+      ownerId: ownerId,
+      sitterId: sitterId,
+    )).single;
     expect(saved.senderName, 'Test Bakıcı');
     expect(saved.senderRole, UserRole.sitter);
     expect(_messageAlignment(tester, message), Alignment.centerRight);
     expect(
-      repository.getChatMessages(
+      (await const ConversationRepository().readAll(
         ownerId: ownerId,
         sitterId: 'another_widget_contact',
-      ),
+      )),
       isEmpty,
     );
 
@@ -66,13 +71,10 @@ void main() {
 
       expect(tester.takeException(), isNull);
       expect(
-        repository
-            .getChatMessages(
-              ownerId: repository.getOwnerId(),
-              sitterId: 'chat_widget_disposal_test',
-            )
-            .single
-            .text,
+        (await const ConversationRepository().readAll(
+          ownerId: repository.getOwnerId(),
+          sitterId: 'chat_widget_disposal_test',
+        )).single.text,
         'Pencere kapanırken mesaj',
       );
     },

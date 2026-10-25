@@ -1,22 +1,25 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/constants/app_dimens.dart';
+import '../../../core/widgets/async_action_builder.dart';
 import '../../../core/constants/app_strings.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/app_typography.dart';
-import '../../../core/widgets/modals/chat_modal.dart';
+import '../../chat/view/chat_modal.dart';
 import '../../../core/widgets/modals/live_tracking_modal.dart';
 import '../../../core/widgets/paw_avatar_image.dart';
 import '../../../core/widgets/paw_header_actions.dart';
 import '../../../data/models/models.dart';
+import '../../../data/models/health_summary.dart';
 import '../../pets/controller/pets_controller.dart';
 import '../../pets/widgets/dog_form_modals.dart';
 import '../../pets/widgets/health_card_modal.dart';
+import '../../pets/widgets/health_summary_labels.dart';
 
 class OwnerHomeTopHeader extends StatelessWidget {
   final String ownerName;
   final String dogName;
-  final VoidCallback onSwitchRole;
+  final Future<void> Function() onSwitchRole;
   final int unreadNotifications;
   final VoidCallback onNotificationsTap;
 
@@ -46,14 +49,16 @@ class OwnerHomeTopHeader extends StatelessWidget {
               ),
               const SizedBox(height: AppDimens.p2),
               Text(
-                AppStrings.dogStatusGreat(dogName),
+                AppStrings.ownerDashboardSubtitle,
                 style: textTheme.bodyMedium,
               ),
             ],
           ),
         ),
         const SizedBox(width: AppDimens.p8),
-        _SwitchToSitterChip(onTap: onSwitchRole),
+        _SwitchToSitterChip(
+          onTap: () => performUiAction(context, onSwitchRole),
+        ),
         const SizedBox(width: AppDimens.p8),
         PawHeaderActions(
           unreadCount: unreadNotifications,
@@ -163,34 +168,11 @@ class _DogQuickProfileDetails extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = context.colors;
     final textTheme = context.pawTextTheme;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
-        Row(
-          children: <Widget>[
-            Text(dog.name, style: textTheme.titleMedium),
-            const SizedBox(width: AppDimens.p6),
-            Container(
-              padding: const EdgeInsets.symmetric(
-                horizontal: AppDimens.p6,
-                vertical: AppDimens.p2,
-              ),
-              decoration: BoxDecoration(
-                color: colors.secondaryContainer,
-                borderRadius: BorderRadius.circular(AppDimens.radiusXs),
-              ),
-              child: Text(
-                AppStrings.ageYearsBadge(dog.ageYears),
-                style: AppTypography.toMicroTag(
-                  textTheme.labelSmall!,
-                  color: colors.primary,
-                ),
-              ),
-            ),
-          ],
-        ),
+        _buildNameAndAge(context),
         const SizedBox(height: AppDimens.p2),
         Text(
           AppStrings.breedAndWeight(dog.breed, dog.weightKg),
@@ -198,6 +180,42 @@ class _DogQuickProfileDetails extends StatelessWidget {
         ),
         const SizedBox(height: AppDimens.p8),
         _DogQuickActionsRow(dog: dog, petsController: petsController),
+      ],
+    );
+  }
+
+  Widget _buildNameAndAge(BuildContext context) {
+    final colors = context.colors;
+    final textTheme = context.pawTextTheme;
+
+    return Row(
+      children: <Widget>[
+        Flexible(
+          child: Text(
+            dog.name,
+            style: textTheme.titleMedium,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+        const SizedBox(width: AppDimens.p6),
+        Container(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppDimens.p6,
+            vertical: AppDimens.p2,
+          ),
+          decoration: BoxDecoration(
+            color: colors.secondaryContainer,
+            borderRadius: BorderRadius.circular(AppDimens.radiusXs),
+          ),
+          child: Text(
+            AppStrings.ageYearsBadge(dog.ageYears),
+            style: AppTypography.toMicroTag(
+              textTheme.labelSmall!,
+              color: colors.primary,
+            ),
+          ),
+        ),
       ],
     );
   }
@@ -246,7 +264,6 @@ class _QuickActionChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.colors;
     final pawTheme = context.pawTheme;
-    final textTheme = context.pawTextTheme;
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(AppDimens.radiusXs),
@@ -264,20 +281,31 @@ class _QuickActionChip extends StatelessWidget {
             ),
           ),
         ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: <Widget>[
-            if (icon != null) ...<Widget>[
-              Icon(icon, size: AppDimens.iconXxs, color: colors.primary),
-              const SizedBox(width: AppDimens.p4),
-            ],
-            Text(
-              label,
-              style: textTheme.labelSmall?.copyWith(color: colors.primary),
-            ),
-          ],
-        ),
+        child: _buildLabel(context),
       ),
+    );
+  }
+
+  Widget _buildLabel(BuildContext context) {
+    final colors = context.colors;
+    final textTheme = context.pawTextTheme;
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: <Widget>[
+        if (icon != null) ...<Widget>[
+          Icon(icon, size: AppDimens.iconXxs, color: colors.primary),
+          const SizedBox(width: AppDimens.p4),
+        ],
+        Flexible(
+          child: Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: textTheme.labelSmall?.copyWith(color: colors.primary),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -314,12 +342,11 @@ class UpcomingVaccineAlertCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final pawTheme = context.pawTheme;
-    return ValueListenableBuilder<Dog>(
+    return ValueListenableBuilder<Dog?>(
       valueListenable: petsController,
       builder: (context, dog, _) {
-        final upcoming = dog.vaccinations
-            .where((v) => v.status == VaccineStatus.upcoming)
-            .firstOrNull;
+        if (dog == null) return const SizedBox.shrink();
+        final summary = petsController.healthSummary;
         return Container(
           padding: const EdgeInsets.all(AppDimens.p16),
           decoration: BoxDecoration(
@@ -331,9 +358,7 @@ class UpcomingVaccineAlertCard extends StatelessWidget {
             children: <Widget>[
               const _VaccineIconCircle(),
               const SizedBox(width: AppDimens.p14),
-              Expanded(
-                child: _VaccineAlertInfoColumn(upcomingVaccine: upcoming),
-              ),
+              Expanded(child: _VaccineAlertInfoColumn(summary: summary)),
               _vaccineCardButton(context),
             ],
           ),
@@ -366,23 +391,14 @@ class _VaccineIconCircle extends StatelessWidget {
 }
 
 class _VaccineAlertInfoColumn extends StatelessWidget {
-  final Vaccination? upcomingVaccine;
+  final HealthSummary summary;
 
-  const _VaccineAlertInfoColumn({required this.upcomingVaccine});
+  const _VaccineAlertInfoColumn({required this.summary});
 
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
     final textTheme = context.pawTextTheme;
-    final title = upcomingVaccine != null
-        ? AppStrings.vaccineTimeTitle(upcomingVaccine!.title)
-        : AppStrings.allVaccinesCompletedTitle;
-    final subtitle = upcomingVaccine != null
-        ? AppStrings.vaccineAppointmentSubtitle(
-            upcomingVaccine!.dueDate,
-            upcomingVaccine!.vetName,
-          )
-        : AppStrings.noUpcomingVaccineSubtitle;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
@@ -391,18 +407,18 @@ class _VaccineAlertInfoColumn extends StatelessWidget {
           crossAxisAlignment: WrapCrossAlignment.center,
           children: <Widget>[
             Text(
-              title,
+              summary.title,
               style: AppTypography.toBold(
                 textTheme.titleMedium!,
                 color: colors.tertiary,
               ),
             ),
-            if (upcomingVaccine != null) const _DaysLeftBadge(),
+            if (summary.primary != null) _DaysLeftBadge(label: summary.timing),
           ],
         ),
         const SizedBox(height: AppDimens.p2),
         Text(
-          subtitle,
+          summary.subtitle,
           style: textTheme.bodySmall?.copyWith(color: colors.tertiary),
         ),
       ],
@@ -411,7 +427,8 @@ class _VaccineAlertInfoColumn extends StatelessWidget {
 }
 
 class _DaysLeftBadge extends StatelessWidget {
-  const _DaysLeftBadge();
+  final String label;
+  const _DaysLeftBadge({required this.label});
 
   @override
   Widget build(BuildContext context) {
@@ -428,7 +445,7 @@ class _DaysLeftBadge extends StatelessWidget {
         borderRadius: BorderRadius.circular(AppDimens.radiusXs),
       ),
       child: Text(
-        AppStrings.statusUpcoming,
+        label,
         style: AppTypography.toMicroTag(
           textTheme.labelSmall!,
           color: pawTheme.pureWhite,
@@ -441,11 +458,19 @@ class _DaysLeftBadge extends StatelessWidget {
 class TodaysReservationLiveCard extends StatelessWidget {
   final BookingRequest? activeBooking;
   final VoidCallback onExplore;
+  final VoidCallback? onOpenBookings;
+  final DateTime? now;
+  final String emptyActionLabel;
+  final String? emptyBody;
 
   const TodaysReservationLiveCard({
     super.key,
     required this.onExplore,
     this.activeBooking,
+    this.onOpenBookings,
+    this.now,
+    this.emptyActionLabel = AppStrings.exploreSittersButton,
+    this.emptyBody,
   });
 
   @override
@@ -458,18 +483,32 @@ class TodaysReservationLiveCard extends StatelessWidget {
           children: <Widget>[
             Expanded(
               child: Text(
-                AppStrings.todaysReservationTitle,
+                activeBooking != null &&
+                        !activeBooking!.isActiveAt(now ?? DateTime.now())
+                    ? AppStrings.upcomingReservationTitle
+                    : AppStrings.todaysReservationTitle,
                 style: context.pawTextTheme.titleLarge,
               ),
             ),
-            if (activeBooking != null) const _PulsingReservationBadge(),
+            if (activeBooking?.isActiveAt(now ?? DateTime.now()) ?? false)
+              const _PulsingReservationBadge(),
           ],
         ),
         const SizedBox(height: AppDimens.p12),
         if (activeBooking case final booking?)
-          _TodaysReservationBodyCard(booking: booking)
+          _TodaysReservationBodyCard(
+            booking: booking,
+            onOpenBookings: onOpenBookings,
+            allowTracking:
+                booking.serviceType == ServiceType.walk &&
+                booking.isActiveAt(now ?? DateTime.now()),
+          )
         else
-          _NoActiveReservationCard(onExplore: onExplore),
+          _NoActiveReservationCard(
+            onExplore: onExplore,
+            actionLabel: emptyActionLabel,
+            body: emptyBody,
+          ),
       ],
     );
   }
@@ -540,7 +579,13 @@ class _ActiveReservationBadge extends StatelessWidget {
 class _NoActiveReservationCard extends StatelessWidget {
   final VoidCallback onExplore;
 
-  const _NoActiveReservationCard({required this.onExplore});
+  final String actionLabel;
+  final String? body;
+  const _NoActiveReservationCard({
+    required this.onExplore,
+    required this.actionLabel,
+    this.body,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -560,14 +605,14 @@ class _NoActiveReservationCard extends StatelessWidget {
           ),
           const SizedBox(height: AppDimens.p8),
           Text(
-            AppStrings.noActiveReservationSubtitle,
+            body ?? AppStrings.noActiveReservationSubtitle,
             style: textTheme.bodyMedium,
           ),
           const SizedBox(height: AppDimens.p16),
           FilledButton.icon(
             onPressed: onExplore,
             icon: const Icon(Icons.search, size: AppDimens.iconSm),
-            label: const Text(AppStrings.exploreSittersButton),
+            label: Text(actionLabel),
           ),
         ],
       ),
@@ -590,8 +635,14 @@ BoxDecoration _reservationCardDecoration(BuildContext context) {
 
 class _TodaysReservationBodyCard extends StatelessWidget {
   final BookingRequest booking;
+  final VoidCallback? onOpenBookings;
+  final bool allowTracking;
 
-  const _TodaysReservationBodyCard({required this.booking});
+  const _TodaysReservationBodyCard({
+    required this.booking,
+    required this.allowTracking,
+    this.onOpenBookings,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -602,13 +653,23 @@ class _TodaysReservationBodyCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
           _TodaysWalkerRow(booking: booking),
+          Text(booking.petName, style: context.pawTextTheme.titleSmall),
           const SizedBox(height: AppDimens.p12),
           Text(
-            AppStrings.formatDateRange(booking.startDate, booking.endDate),
+            AppStrings.bookingPeriod(
+              booking.startDate,
+              booking.endDate,
+              hourly: booking.serviceType == ServiceType.walk,
+              dayCare: booking.serviceType == ServiceType.dayCare,
+            ),
             style: context.pawTextTheme.bodySmall,
           ),
           const SizedBox(height: AppDimens.p16),
-          _TodaysReservationButtons(booking: booking),
+          _TodaysReservationButtons(
+            booking: booking,
+            allowTracking: allowTracking,
+            onOpenBookings: onOpenBookings,
+          ),
         ],
       ),
     );
@@ -627,7 +688,11 @@ class _TodaysWalkerRow extends StatelessWidget {
       children: <Widget>[
         CircleAvatar(
           radius: AppDimens.avatarRadiusLg,
-          backgroundImage: PawImageProvider.resolve(booking.sitterPhoto),
+          backgroundImage: PawImageProvider.avatar(
+            context,
+            booking.sitterPhoto,
+            radius: AppDimens.avatarRadiusLg,
+          ),
         ),
         const SizedBox(width: AppDimens.p14),
         Expanded(
@@ -652,8 +717,14 @@ class _TodaysWalkerRow extends StatelessWidget {
 
 class _TodaysReservationButtons extends StatelessWidget {
   final BookingRequest booking;
+  final bool allowTracking;
+  final VoidCallback? onOpenBookings;
 
-  const _TodaysReservationButtons({required this.booking});
+  const _TodaysReservationButtons({
+    required this.booking,
+    required this.allowTracking,
+    this.onOpenBookings,
+  });
 
   ButtonStyle _primaryStyle(ColorScheme colors) => ElevatedButton.styleFrom(
     backgroundColor: colors.primary,
@@ -703,9 +774,15 @@ class _TodaysReservationButtons extends StatelessWidget {
       children: <Widget>[
         Expanded(
           child: ElevatedButton.icon(
-            onPressed: () => LiveTrackingModal.show(context),
+            onPressed: allowTracking
+                ? () => LiveTrackingModal.show(context, booking: booking)
+                : onOpenBookings,
             icon: const Icon(Icons.navigation_outlined, size: AppDimens.iconSm),
-            label: const Text(AppStrings.liveTrackingButton),
+            label: Text(
+              allowTracking
+                  ? AppStrings.liveTrackingButton
+                  : AppStrings.viewReservation,
+            ),
             style: _primaryStyle(context.colors),
           ),
         ),
@@ -844,7 +921,12 @@ class _FeaturedSitterInfoColumn extends StatelessWidget {
                 overflow: TextOverflow.ellipsis,
               ),
             ),
-            Icon(Icons.verified, size: AppDimens.iconXs, color: colors.primary),
+            if (sitter.isVerified)
+              Icon(
+                Icons.verified,
+                size: AppDimens.iconXs,
+                color: colors.primary,
+              ),
           ],
         ),
         const SizedBox(height: AppDimens.p2),

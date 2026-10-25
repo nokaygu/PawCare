@@ -1,5 +1,8 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:ui' as ui;
+
+import 'package:image_picker/image_picker.dart';
 
 import 'package:flutter/painting.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -69,6 +72,55 @@ void main() {
       }
     });
   });
+
+  testWidgets(
+    'Large desktop photo is persisted at 1600px and avatar variants are evicted',
+    (tester) async {
+      await tester.runAsync(() async {
+        final directory = await Directory.systemTemp.createTemp(
+          'pawcare_large_image_',
+        );
+        try {
+          final recorder = ui.PictureRecorder();
+          final canvas = ui.Canvas(recorder);
+          canvas.drawPaint(ui.Paint()..color = const ui.Color(0xff556644));
+          final picture = recorder.endRecording();
+          final source = await picture.toImage(4000, 3000);
+          final png = await source.toByteData(format: ui.ImageByteFormat.png);
+          final original = await File('${directory.path}/original.png')
+              .writeAsBytes(png!.buffer.asUint8List());
+          source.dispose();
+          picture.dispose();
+          final service = ImageStorageService(
+            documentsDirectory: () async => directory,
+          );
+          final path = await service.savePickedPhoto(XFile(original.path));
+          final buffer = await ui.ImmutableBuffer.fromFilePath(path);
+          final descriptor = await ui.ImageDescriptor.encoded(buffer);
+          expect(descriptor.width, 1600);
+          expect(descriptor.height, 1200);
+          descriptor.dispose();
+          buffer.dispose();
+          final variants = [
+            for (final width in [64, 192, 512])
+              PawImageProvider.resolve(path, cacheWidth: width),
+          ];
+          final keys = <Object>[];
+          for (final variant in variants) {
+            await _loadImage(variant);
+            keys.add(await variant.obtainKey(ImageConfiguration.empty));
+          }
+          final cache = PaintingBinding.instance.imageCache;
+          expect(keys.every(cache.containsKey), isTrue);
+          await service.deletePetPhoto(path);
+          expect(keys.any(cache.containsKey), isFalse);
+          expect(await original.exists(), isTrue);
+        } finally {
+          await directory.delete(recursive: true);
+        }
+      });
+    },
+  );
 
   testWidgets('Avatar providers load a bundled fallback for missing files', (
     tester,

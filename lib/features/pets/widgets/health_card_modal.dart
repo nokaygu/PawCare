@@ -3,12 +3,18 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 
 import '../../../core/constants/app_dimens.dart';
+import '../../../core/widgets/paw_paged_list.dart';
 import '../../../core/constants/app_strings.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/widgets/paw_avatar_image.dart';
+import '../../../core/widgets/paw_vaccine_status_badge.dart';
+import '../../../core/widgets/async_action_builder.dart';
 import '../../../data/models/models.dart';
+import '../../../data/models/health_summary.dart';
 import '../controller/pets_controller.dart';
+import 'empty_pets_card.dart';
+import 'health_summary_labels.dart';
 
 class HealthCardModal extends StatelessWidget {
   final PetsController petsController;
@@ -61,12 +67,14 @@ class HealthCardModal extends StatelessWidget {
           decoration: _dialogDecoration(colors, pawTheme),
           child: SingleChildScrollView(
             padding: const EdgeInsets.all(AppDimens.paddingXl),
-            child: ValueListenableBuilder<Dog>(
+            child: ValueListenableBuilder<Dog?>(
               valueListenable: petsController,
-              builder: (context, dog, _) => _HealthCardModalBody(
-                dog: dog,
-                petsController: petsController,
-              ),
+              builder: (context, dog, _) => dog == null
+                  ? EmptyPetsCard(controller: petsController)
+                  : _HealthCardModalBody(
+                      dog: dog,
+                      petsController: petsController,
+                    ),
             ),
           ),
         ),
@@ -108,16 +116,13 @@ class _HealthCardModalBody extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textTheme = context.pawTextTheme;
-    final upcoming = dog.vaccinations
-        .where((v) => v.status == VaccineStatus.upcoming)
-        .firstOrNull;
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
         _HealthCardHeader(dog: dog),
         const SizedBox(height: AppDimens.p20),
-        _UpcomingVaccineBanner(upcomingVaccine: upcoming),
+        _UpcomingVaccineBanner(summary: petsController.healthSummary),
         const SizedBox(height: AppDimens.p20),
         Text(
           AppStrings.vaccineAndTreatmentRecordsTitle,
@@ -126,7 +131,10 @@ class _HealthCardModalBody extends StatelessWidget {
         const SizedBox(height: AppDimens.p12),
         _VaccinationsList(
           vaccinations: dog.vaccinations,
-          onToggleStatus: petsController.toggleVaccinationStatus,
+          onToggleStatus: (id) => performUiAction(
+            context,
+            () => petsController.toggleVaccinationStatus(id),
+          ),
         ),
         const SizedBox(height: AppDimens.p20),
         _addVaccineButton(context),
@@ -144,32 +152,10 @@ class _HealthCardHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.colors;
     final pawTheme = context.pawTheme;
-    final textTheme = context.pawTextTheme;
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: <Widget>[
-        Row(
-          children: <Widget>[
-            CircleAvatar(
-              radius: AppDimens.avatarRadiusMd,
-              backgroundImage: PawImageProvider.resolve(dog.photoPath),
-            ),
-            const SizedBox(width: AppDimens.p12),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Text(
-                  AppStrings.healthCardModalTitle(dog.name),
-                  style: textTheme.titleMedium,
-                ),
-                Text(
-                  AppStrings.breedAndAge(dog.breed, dog.ageYears),
-                  style: textTheme.bodySmall,
-                ),
-              ],
-            ),
-          ],
-        ),
+        _buildIdentity(context),
         IconButton(
           icon: Icon(Icons.close, color: colors.onSurfaceVariant),
           onPressed: () => Navigator.of(context).pop(),
@@ -181,12 +167,49 @@ class _HealthCardHeader extends StatelessWidget {
       ],
     );
   }
+
+  Widget _buildIdentity(BuildContext context) {
+    final textTheme = context.pawTextTheme;
+
+    return Expanded(
+      child: Row(
+        children: <Widget>[
+          CircleAvatar(
+            radius: AppDimens.avatarRadiusMd,
+            backgroundImage: PawImageProvider.avatar(
+              context,
+              dog.photoPath,
+              radius: AppDimens.avatarRadiusMd,
+            ),
+          ),
+          const SizedBox(width: AppDimens.p12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text(
+                  AppStrings.healthCardModalTitle(dog.name),
+                  style: textTheme.titleMedium,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                Text(
+                  AppStrings.breedAndAge(dog.breed, dog.ageYears),
+                  style: textTheme.bodySmall,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _UpcomingVaccineBanner extends StatelessWidget {
-  final Vaccination? upcomingVaccine;
+  final HealthSummary summary;
 
-  const _UpcomingVaccineBanner({required this.upcomingVaccine});
+  const _UpcomingVaccineBanner({required this.summary});
 
   Widget _buildBellIcon(ColorScheme colors, PawThemeExtension pawTheme) {
     return Container(
@@ -203,16 +226,8 @@ class _UpcomingVaccineBanner extends StatelessWidget {
     );
   }
 
-  String get _title => upcomingVaccine != null
-      ? AppStrings.upcomingVaccineBannerTitle(upcomingVaccine!.title)
-      : AppStrings.allVaccinesUpToDateTitle;
-
-  String get _subtitle => upcomingVaccine != null
-      ? AppStrings.upcomingVaccineBannerSubtitle(
-          upcomingVaccine!.dueDate,
-          upcomingVaccine!.vetName,
-        )
-      : AppStrings.noPlannedVaccineSubtitle;
+  String get _title => summary.title;
+  String get _subtitle => summary.subtitle;
 
   @override
   Widget build(BuildContext context) {
@@ -266,9 +281,7 @@ class _VaccinationsList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ListView.separated(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
+    return PawPagedList(
       itemCount: vaccinations.length,
       separatorBuilder: (_, _) => const SizedBox(height: AppDimens.p10),
       itemBuilder: (context, index) {
@@ -333,37 +346,8 @@ class _HealthCardVaccineRow extends StatelessWidget {
                 ],
               ),
             ),
-            _HealthVaccineStatusBadge(isDone: isDone),
+            PawVaccineStatusBadge(status: vaccination.statusAt(DateTime.now())),
           ],
-        ),
-      ),
-    );
-  }
-}
-
-class _HealthVaccineStatusBadge extends StatelessWidget {
-  final bool isDone;
-
-  const _HealthVaccineStatusBadge({required this.isDone});
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.colors;
-    final pawTheme = context.pawTheme;
-    final textTheme = context.pawTextTheme;
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppDimens.p8,
-        vertical: AppDimens.p4,
-      ),
-      decoration: BoxDecoration(
-        color: isDone ? pawTheme.successContainer : colors.secondaryContainer,
-        borderRadius: BorderRadius.circular(AppDimens.radiusSm),
-      ),
-      child: Text(
-        isDone ? AppStrings.statusCompleted : AppStrings.statusPending,
-        style: textTheme.labelSmall?.copyWith(
-          color: isDone ? pawTheme.success : colors.primary,
         ),
       ),
     );
@@ -393,14 +377,11 @@ class _AddVaccineDialog extends StatefulWidget {
 
 class _AddVaccineDialogState extends State<_AddVaccineDialog> {
   final TextEditingController _titleController = TextEditingController(
-    text: AppStrings.defaultVaccineTitle,
+    text: '',
   );
-  final TextEditingController _dateController = TextEditingController(
-    text: AppStrings.defaultVaccineDate,
-  );
-  final TextEditingController _vetController = TextEditingController(
-    text: AppStrings.defaultVaccineVet,
-  );
+  final TextEditingController _dateController = TextEditingController(text: '');
+  DateTime? _selectedDate;
+  final TextEditingController _vetController = TextEditingController(text: '');
 
   @override
   void dispose() {
@@ -411,13 +392,31 @@ class _AddVaccineDialogState extends State<_AddVaccineDialog> {
   }
 
   Future<void> _save() async {
+    final date = _selectedDate;
+    if (date == null) throw ArgumentError(AppStrings.invalidVaccineDate);
     await widget.petsController.addVaccination(
       title: _titleController.text,
-      dueDate: _dateController.text,
+      dueAt: date,
       vetName: _vetController.text,
     );
     if (!mounted) return;
     Navigator.of(context).pop();
+  }
+
+  Future<void> _pickDate() async {
+    final date = await showDatePicker(
+      context: context,
+      initialDate: _selectedDate ?? DateTime.now(),
+      firstDate: DateTime(1900),
+      lastDate: DateTime(2200),
+      helpText: AppStrings.fieldPlannedDate,
+      cancelText: AppStrings.cancel,
+      confirmText: AppStrings.ok,
+    );
+    if (mounted && date != null) {
+      _selectedDate = date;
+      _dateController.text = AppStrings.formatShortDate(date);
+    }
   }
 
   @override
@@ -436,19 +435,23 @@ class _AddVaccineDialogState extends State<_AddVaccineDialog> {
         titleController: _titleController,
         dateController: _dateController,
         vetController: _vetController,
+        onPickDate: _pickDate,
       ),
       actions: <Widget>[
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
           child: Text(AppStrings.cancel, style: textTheme.bodyLarge),
         ),
-        ElevatedButton(
-          onPressed: _save,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: colors.primary,
-            foregroundColor: colors.onPrimary,
+        AsyncActionBuilder(
+          action: _save,
+          builder: (_, save, busy) => ElevatedButton(
+            onPressed: save,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: colors.primary,
+              foregroundColor: colors.onPrimary,
+            ),
+            child: Text(busy ? AppStrings.saving : AppStrings.save),
           ),
-          child: const Text(AppStrings.save),
         ),
       ],
     );
@@ -459,11 +462,13 @@ class _AddVaccineFormFields extends StatelessWidget {
   final TextEditingController titleController;
   final TextEditingController dateController;
   final TextEditingController vetController;
+  final VoidCallback onPickDate;
 
   const _AddVaccineFormFields({
     required this.titleController,
     required this.dateController,
     required this.vetController,
+    required this.onPickDate,
   });
 
   @override
@@ -480,6 +485,8 @@ class _AddVaccineFormFields extends StatelessWidget {
         const SizedBox(height: AppDimens.p12),
         TextField(
           controller: dateController,
+          readOnly: true,
+          onTap: onPickDate,
           decoration: const InputDecoration(
             labelText: AppStrings.fieldPlannedDate,
           ),

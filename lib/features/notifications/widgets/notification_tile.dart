@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/constants/app_dimens.dart';
+import '../../../core/constants/app_strings.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../data/models/models.dart';
 
 class NotificationTile extends StatelessWidget {
   final NotificationItem item;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
 
   const NotificationTile({super.key, required this.item, required this.onTap});
 
@@ -106,7 +107,10 @@ class _NotificationBody extends StatelessWidget {
                     : AppTypography.toBold(textTheme.bodyLarge!),
               ),
             ),
-            Text(item.timeLabel, style: textTheme.bodySmall),
+            Text(
+              AppStrings.notificationTime(item.createdAt, DateTime.now()),
+              style: textTheme.bodySmall,
+            ),
           ],
         ),
         const SizedBox(height: AppDimens.p4),

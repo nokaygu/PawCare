@@ -4,10 +4,12 @@ import '../../../core/constants/app_dimens.dart';
 import '../../../core/constants/app_strings.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/paw_header_actions.dart';
+import '../../../core/widgets/async_action_builder.dart';
 import '../../../data/models/models.dart';
 import '../controller/pets_controller.dart';
 import '../widgets/dog_form_modals.dart';
 import '../widgets/dog_profile_sections.dart';
+import '../widgets/empty_pets_card.dart';
 
 class DogProfileScreen extends StatelessWidget {
   final PetsController petsController;
@@ -22,8 +24,14 @@ class DogProfileScreen extends StatelessWidget {
   });
 
   Future<void> _handlePhotoPick(BuildContext context) async {
-    final updated = await petsController.pickAndUpdatePhoto();
-    if (!context.mounted || !updated) return;
+    if (petsController.isBusy) return;
+    var updated = false;
+    await performUiAction(context, () async {
+      updated = await petsController.pickAndUpdatePhoto();
+    }, warning: () => petsController.lastWarning);
+    if (!context.mounted || !updated || petsController.lastWarning != null) {
+      return;
+    }
     ScaffoldMessenger.of(
       context,
     ).showSnackBar(const SnackBar(content: Text(AppStrings.photoUpdatedSnack)));
@@ -36,10 +44,12 @@ class DogProfileScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: pawTheme.background,
       body: SafeArea(
-        child: ValueListenableBuilder<Dog>(
+        child: ValueListenableBuilder<Dog?>(
           valueListenable: petsController,
           builder: (context, dog, _) {
+            if (dog == null) return EmptyPetsCard(controller: petsController);
             return SingleChildScrollView(
+              key: const PageStorageKey('pet_scroll'),
               padding: const EdgeInsets.symmetric(
                 horizontal: AppDimens.paddingLg,
                 vertical: AppDimens.paddingLg,
@@ -98,11 +108,7 @@ class _DogProfileContent extends StatelessWidget {
         ),
         if (allDogs.length > 1) ...<Widget>[
           const SizedBox(height: AppDimens.p14),
-          DogSelectorChipsRow(
-            dogs: allDogs,
-            selectedDogId: dog.id,
-            onSelectDog: petsController.selectDog,
-          ),
+          _buildPetSelector(context),
         ],
         const SizedBox(height: AppDimens.p20),
         DogPhotoAvatarSection(dog: dog, onPickPhoto: onPickPhoto),
@@ -111,15 +117,29 @@ class _DogProfileContent extends StatelessWidget {
         const SizedBox(height: AppDimens.p16),
         _buildActionRow(context),
         const SizedBox(height: AppDimens.p24),
-        CriticalHealthWarningCard(allergyNote: dog.allergyNote),
+        if (dog.allergyNote.isNotEmpty)
+          CriticalHealthWarningCard(allergyNote: dog.allergyNote),
         const SizedBox(height: AppDimens.p24),
         VaccineScheduleSection(dog: dog, petsController: petsController),
         const SizedBox(height: AppDimens.p24),
-        NutritionAndBehaviorSection(behaviorNote: dog.behaviorNote),
+        NutritionAndBehaviorSection(
+          behaviorNote: dog.behaviorNote,
+          nutritionPlan: dog.nutritionPlan,
+        ),
         const SizedBox(height: AppDimens.p24),
         VetClinicCardSection(dog: dog),
         const SizedBox(height: AppDimens.p24),
       ],
+    );
+  }
+
+  Widget _buildPetSelector(BuildContext context) {
+    final allDogs = petsController.allDogs;
+    return DogSelectorChipsRow(
+      dogs: allDogs,
+      selectedDogId: dog.id,
+      onSelectDog: (id) =>
+          performUiAction(context, () => petsController.selectDog(id)),
     );
   }
 }
@@ -150,7 +170,7 @@ class _DogProfileHeader extends StatelessWidget {
           ),
         ),
         IconButton(
-          icon: Icon(Icons.qr_code, color: colors.primary),
+          icon: Icon(Icons.badge_outlined, color: colors.primary),
           onPressed: () => MicrochipIdentityModal.show(context, dog: dog),
           style: IconButton.styleFrom(
             backgroundColor: pawTheme.surfaceContainerLowest,

@@ -1,14 +1,18 @@
 import 'package:flutter/foundation.dart';
 
-import 'conversation_identity.dart';
+import 'service_type.dart';
+import 'calendar_date.dart';
+import '../../core/constants/app_strings.dart';
 
 export 'conversation_identity.dart';
+export 'service_type.dart';
+export 'money.dart';
 
 enum UserRole { owner, sitter }
 
 enum VaccineStatus { completed, upcoming, overdue }
 
-enum BookingStatus { pending, confirmed, rejected, completed }
+enum BookingStatus { pending, confirmed, rejected, completed, cancelled }
 
 enum NotificationType {
   bookingCreated,
@@ -21,62 +25,76 @@ enum NotificationType {
 class Vaccination {
   final String id;
   final String title;
-  final String dueDate;
+  final DateTime? dueAt;
   final VaccineStatus status;
   final String vetName;
-  final String? completionDate;
-
-  const Vaccination({
+  final DateTime? completedAt;
+  Vaccination({
     required this.id,
     required this.title,
-    required this.dueDate,
+    required DateTime? dueAt,
     required this.status,
     required this.vetName,
-    this.completionDate,
-  });
+    this.completedAt,
+  }) : dueAt = dueAt == null ? null : CalendarDate.day(dueAt);
+
+  String get dueDate => dueAt == null
+      ? AppStrings.dateUnknown
+      : AppStrings.formatShortDate(dueAt!);
+  String? get completionDate =>
+      completedAt == null ? null : AppStrings.formatShortDate(completedAt!);
+  VaccineStatus statusAt(DateTime now) {
+    if (status == VaccineStatus.completed) return status;
+    if (dueAt == null) return status;
+    return dueAt!.isBefore(CalendarDate.day(now))
+        ? VaccineStatus.overdue
+        : VaccineStatus.upcoming;
+  }
 
   Vaccination copyWith({
     String? id,
     String? title,
-    String? dueDate,
+    DateTime? dueAt,
     VaccineStatus? status,
     String? vetName,
-    String? completionDate,
-  }) {
-    return Vaccination(
-      id: id ?? this.id,
-      title: title ?? this.title,
-      dueDate: dueDate ?? this.dueDate,
-      status: status ?? this.status,
-      vetName: vetName ?? this.vetName,
-      completionDate: completionDate ?? this.completionDate,
-    );
-  }
+    DateTime? completedAt,
+    bool clearCompletion = false,
+  }) => Vaccination(
+    id: id ?? this.id,
+    title: title ?? this.title,
+    dueAt: dueAt ?? this.dueAt,
+    status: status ?? this.status,
+    vetName: vetName ?? this.vetName,
+    completedAt: clearCompletion ? null : completedAt ?? this.completedAt,
+  );
 
-  Map<String, dynamic> toMap() {
-    return <String, dynamic>{
-      'id': id,
-      'title': title,
-      'dueDate': dueDate,
-      'status': status.name,
-      'vetName': vetName,
-      'completionDate': completionDate,
-    };
-  }
+  Map<String, dynamic> toMap() => <String, dynamic>{
+    'id': id,
+    'title': title,
+    'dueOn': dueAt == null ? null : CalendarDate.iso(dueAt!),
+    'status': status.name,
+    'vetName': vetName,
+    'completedAt': completedAt?.millisecondsSinceEpoch,
+  };
 
   factory Vaccination.fromMap(Map<dynamic, dynamic> map) {
-    final statusName = map['status'] as String? ?? VaccineStatus.upcoming.name;
-    final parsedStatus = VaccineStatus.values.firstWhere(
-      (e) => e.name == statusName,
-      orElse: () => VaccineStatus.upcoming,
-    );
+    if (!map.containsKey('dueOn')) {
+      throw const FormatException('Missing vaccination date');
+    }
+    final date = map['dueOn'] as String?;
+    final due = CalendarDate.tryParse(date);
+    if (date != null && due == null) {
+      throw const FormatException('Invalid vaccination date');
+    }
     return Vaccination(
-      id: map['id'] as String? ?? '',
-      title: map['title'] as String? ?? '',
-      dueDate: map['dueDate'] as String? ?? '',
-      status: parsedStatus,
-      vetName: map['vetName'] as String? ?? '',
-      completionDate: map['completionDate'] as String?,
+      id: map['id'] as String,
+      title: map['title'] as String,
+      dueAt: due,
+      status: VaccineStatus.values.byName(map['status'] as String),
+      vetName: map['vetName'] as String,
+      completedAt: map['completedAt'] == null
+          ? null
+          : DateTime.fromMillisecondsSinceEpoch(map['completedAt'] as int),
     );
   }
 }
@@ -84,6 +102,7 @@ class Vaccination {
 @immutable
 class Dog {
   final String id;
+  final String ownerId;
   final String name;
   final String breed;
   final int ageYears;
@@ -95,10 +114,13 @@ class Dog {
   final String behaviorNote;
   final String clinicName;
   final String clinicPhone;
+  final String nutritionPlan;
+  final String veterinarianName;
   final List<Vaccination> vaccinations;
 
-  const Dog({
+  Dog({
     required this.id,
+    required this.ownerId,
     required this.name,
     required this.breed,
     required this.ageYears,
@@ -110,11 +132,14 @@ class Dog {
     required this.behaviorNote,
     required this.clinicName,
     required this.clinicPhone,
-    required this.vaccinations,
-  });
+    this.nutritionPlan = '',
+    this.veterinarianName = '',
+    required List<Vaccination> vaccinations,
+  }) : vaccinations = List.unmodifiable(vaccinations);
 
   Dog copyWith({
     String? id,
+    String? ownerId,
     String? name,
     String? breed,
     int? ageYears,
@@ -126,10 +151,13 @@ class Dog {
     String? behaviorNote,
     String? clinicName,
     String? clinicPhone,
+    String? nutritionPlan,
+    String? veterinarianName,
     List<Vaccination>? vaccinations,
   }) {
     return Dog(
       id: id ?? this.id,
+      ownerId: ownerId ?? this.ownerId,
       name: name ?? this.name,
       breed: breed ?? this.breed,
       ageYears: ageYears ?? this.ageYears,
@@ -141,6 +169,8 @@ class Dog {
       behaviorNote: behaviorNote ?? this.behaviorNote,
       clinicName: clinicName ?? this.clinicName,
       clinicPhone: clinicPhone ?? this.clinicPhone,
+      nutritionPlan: nutritionPlan ?? this.nutritionPlan,
+      veterinarianName: veterinarianName ?? this.veterinarianName,
       vaccinations: vaccinations ?? this.vaccinations,
     );
   }
@@ -148,6 +178,7 @@ class Dog {
   Map<String, dynamic> toMap() {
     return <String, dynamic>{
       'id': id,
+      'ownerId': ownerId,
       'name': name,
       'breed': breed,
       'ageYears': ageYears,
@@ -159,26 +190,30 @@ class Dog {
       'behaviorNote': behaviorNote,
       'clinicName': clinicName,
       'clinicPhone': clinicPhone,
+      'nutritionPlan': nutritionPlan,
+      'veterinarianName': veterinarianName,
       'vaccinations': vaccinations.map((v) => v.toMap()).toList(),
     };
   }
 
   factory Dog.fromMap(Map<dynamic, dynamic> map) {
-    final rawVaccinations =
-        map['vaccinations'] as List<dynamic>? ?? <dynamic>[];
+    final rawVaccinations = map['vaccinations'] as List;
     return Dog(
-      id: map['id'] as String? ?? '',
-      name: map['name'] as String? ?? '',
-      breed: map['breed'] as String? ?? '',
-      ageYears: (map['ageYears'] as num?)?.toInt() ?? 1,
-      weightKg: (map['weightKg'] as num?)?.toDouble() ?? 10.0,
-      gender: map['gender'] as String? ?? '',
-      microchip: map['microchip'] as String? ?? '',
-      photoPath: map['photoPath'] as String? ?? 'assets/images/barley.jpg',
-      allergyNote: map['allergyNote'] as String? ?? '',
-      behaviorNote: map['behaviorNote'] as String? ?? '',
-      clinicName: map['clinicName'] as String? ?? '',
-      clinicPhone: map['clinicPhone'] as String? ?? '',
+      id: map['id'] as String,
+      ownerId: map['ownerId'] as String,
+      name: map['name'] as String,
+      breed: map['breed'] as String,
+      ageYears: (map['ageYears'] as num).toInt(),
+      weightKg: (map['weightKg'] as num).toDouble(),
+      gender: map['gender'] as String,
+      microchip: map['microchip'] as String,
+      photoPath: map['photoPath'] as String,
+      allergyNote: map['allergyNote'] as String,
+      behaviorNote: map['behaviorNote'] as String,
+      clinicName: map['clinicName'] as String,
+      clinicPhone: map['clinicPhone'] as String,
+      nutritionPlan: map['nutritionPlan'] as String,
+      veterinarianName: map['veterinarianName'] as String,
       vaccinations: rawVaccinations
           .map(
             (item) =>
@@ -206,9 +241,12 @@ class SitterListing {
   final String bio;
   final List<String> amenities;
   final bool isVerified;
+  final bool isPublished;
+  final ServiceType serviceType;
+  final int capacity;
   final List<DateTime> unavailableDates;
 
-  const SitterListing({
+  SitterListing({
     required this.id,
     required this.name,
     required this.facilityTitle,
@@ -220,12 +258,17 @@ class SitterListing {
     required this.location,
     required this.distanceKm,
     required this.imagePath,
-    required this.galleryPaths,
+    required List<String> galleryPaths,
     required this.bio,
-    required this.amenities,
-    this.isVerified = true,
-    this.unavailableDates = const <DateTime>[],
-  });
+    required List<String> amenities,
+    this.isVerified = false,
+    this.isPublished = true,
+    required this.serviceType,
+    this.capacity = 1,
+    List<DateTime> unavailableDates = const <DateTime>[],
+  }) : galleryPaths = List.unmodifiable(galleryPaths),
+       amenities = List.unmodifiable(amenities),
+       unavailableDates = List.unmodifiable(unavailableDates);
 
   SitterListing copyWith({
     String? id,
@@ -243,6 +286,9 @@ class SitterListing {
     String? bio,
     List<String>? amenities,
     bool? isVerified,
+    bool? isPublished,
+    ServiceType? serviceType,
+    int? capacity,
     List<DateTime>? unavailableDates,
   }) {
     return SitterListing(
@@ -261,6 +307,9 @@ class SitterListing {
       bio: bio ?? this.bio,
       amenities: amenities ?? this.amenities,
       isVerified: isVerified ?? this.isVerified,
+      isPublished: isPublished ?? this.isPublished,
+      serviceType: serviceType ?? this.serviceType,
+      capacity: capacity ?? this.capacity,
       unavailableDates: unavailableDates ?? this.unavailableDates,
     );
   }
@@ -282,6 +331,9 @@ class SitterListing {
       'bio': bio,
       'amenities': amenities,
       'isVerified': isVerified,
+      'isPublished': isPublished,
+      'serviceType': serviceType.name,
+      'capacity': capacity,
       'unavailableDates': unavailableDates
           .map((d) => d.millisecondsSinceEpoch)
           .toList(),
@@ -289,25 +341,28 @@ class SitterListing {
   }
 
   factory SitterListing.fromMap(Map<dynamic, dynamic> map) {
-    final rawGallery = map['galleryPaths'] as List<dynamic>? ?? <dynamic>[];
-    final rawAmenities = map['amenities'] as List<dynamic>? ?? <dynamic>[];
-    final rawDates = map['unavailableDates'] as List<dynamic>? ?? <dynamic>[];
+    final rawGallery = map['galleryPaths'] as List;
+    final rawAmenities = map['amenities'] as List;
+    final rawDates = map['unavailableDates'] as List;
     return SitterListing(
-      id: map['id'] as String? ?? '',
-      name: map['name'] as String? ?? '',
-      facilityTitle: map['facilityTitle'] as String? ?? '',
-      category: map['category'] as String? ?? '',
-      rating: (map['rating'] as num?)?.toDouble() ?? 5.0,
-      reviewsCount: (map['reviewsCount'] as num?)?.toInt() ?? 0,
-      pricePerUnit: (map['pricePerUnit'] as num?)?.toDouble() ?? 0.0,
-      unitLabel: map['unitLabel'] as String? ?? 'gece',
-      location: map['location'] as String? ?? '',
-      distanceKm: (map['distanceKm'] as num?)?.toDouble() ?? 1.0,
-      imagePath: map['imagePath'] as String? ?? 'assets/images/ayse.jpg',
-      galleryPaths: rawGallery.map((e) => e.toString()).toList(),
-      bio: map['bio'] as String? ?? '',
-      amenities: rawAmenities.map((e) => e.toString()).toList(),
-      isVerified: map['isVerified'] as bool? ?? true,
+      id: map['id'] as String,
+      name: map['name'] as String,
+      facilityTitle: map['facilityTitle'] as String,
+      category: map['category'] as String,
+      rating: (map['rating'] as num).toDouble(),
+      reviewsCount: (map['reviewsCount'] as num).toInt(),
+      pricePerUnit: (map['pricePerUnit'] as num).toDouble(),
+      unitLabel: map['unitLabel'] as String,
+      location: map['location'] as String,
+      distanceKm: (map['distanceKm'] as num).toDouble(),
+      imagePath: map['imagePath'] as String,
+      galleryPaths: rawGallery.cast<String>(),
+      bio: map['bio'] as String,
+      amenities: rawAmenities.cast<String>(),
+      isVerified: map['isVerified'] as bool,
+      isPublished: map['isPublished'] as bool,
+      serviceType: ServiceType.values.byName(map['serviceType'] as String),
+      capacity: map['capacity'] as int,
       unavailableDates: rawDates
           .map((ms) => DateTime.fromMillisecondsSinceEpoch((ms as num).toInt()))
           .toList(),
@@ -332,6 +387,22 @@ class BookingRequest {
   final double totalPrice;
   final String careNotes;
   final BookingStatus status;
+  final String petId;
+  final ServiceType serviceType;
+  final int units;
+  final int unitPriceCents;
+  final int serviceFeeCents;
+  final DateTime createdAt;
+  final DateTime? completedAt;
+
+  bool isActiveAt(DateTime now) =>
+      status == BookingStatus.confirmed &&
+      !now.isBefore(startDate) &&
+      now.isBefore(endDate);
+
+  bool canCancelAt(DateTime now) =>
+      status == BookingStatus.pending ||
+      (status == BookingStatus.confirmed && now.isBefore(startDate));
 
   const BookingRequest({
     required this.id,
@@ -340,15 +411,22 @@ class BookingRequest {
     required this.sitterPhoto,
     required this.petName,
     required this.petBreed,
-    this.petPhotoPath = 'assets/images/barley.jpg',
-    this.ownerName = 'Aygen',
-    this.ownerId = ConversationIdentity.legacyOwnerId,
+    this.petPhotoPath = '',
+    required this.ownerName,
+    required this.ownerId,
     required this.serviceTitle,
     required this.startDate,
     required this.endDate,
     required this.totalPrice,
     required this.careNotes,
     this.status = BookingStatus.pending,
+    required this.petId,
+    required this.serviceType,
+    required this.units,
+    required this.unitPriceCents,
+    required this.serviceFeeCents,
+    required this.createdAt,
+    this.completedAt,
   });
 
   BookingRequest copyWith({
@@ -367,6 +445,13 @@ class BookingRequest {
     double? totalPrice,
     String? careNotes,
     BookingStatus? status,
+    String? petId,
+    ServiceType? serviceType,
+    int? units,
+    int? unitPriceCents,
+    int? serviceFeeCents,
+    DateTime? createdAt,
+    DateTime? completedAt,
   }) {
     return BookingRequest(
       id: id ?? this.id,
@@ -384,6 +469,13 @@ class BookingRequest {
       totalPrice: totalPrice ?? this.totalPrice,
       careNotes: careNotes ?? this.careNotes,
       status: status ?? this.status,
+      petId: petId ?? this.petId,
+      serviceType: serviceType ?? this.serviceType,
+      units: units ?? this.units,
+      unitPriceCents: unitPriceCents ?? this.unitPriceCents,
+      serviceFeeCents: serviceFeeCents ?? this.serviceFeeCents,
+      createdAt: createdAt ?? this.createdAt,
+      completedAt: completedAt ?? this.completedAt,
     );
   }
 
@@ -403,44 +495,43 @@ class BookingRequest {
       'endDate': endDate.millisecondsSinceEpoch,
       'totalPrice': totalPrice,
       'careNotes': careNotes,
+      'petId': petId,
+      'serviceType': serviceType.name,
+      'units': units,
+      'unitPriceCents': unitPriceCents,
+      'serviceFeeCents': serviceFeeCents,
+      'createdAt': createdAt.millisecondsSinceEpoch,
+      'completedAt': completedAt?.millisecondsSinceEpoch,
       'status': status.name,
     };
   }
 
-  factory BookingRequest.fromMap(Map<dynamic, dynamic> map) {
-    final statusName = map['status'] as String? ?? BookingStatus.pending.name;
-    final parsedStatus = BookingStatus.values.firstWhere(
-      (e) => e.name == statusName,
-      orElse: () => BookingStatus.pending,
-    );
-    return BookingRequest(
-      id: map['id'] as String? ?? '',
-      sitterId: map['sitterId'] as String? ?? '',
-      sitterName: map['sitterName'] as String? ?? '',
-      sitterPhoto: map['sitterPhoto'] as String? ?? 'assets/images/ayse.jpg',
-      petName: map['petName'] as String? ?? '',
-      petBreed: map['petBreed'] as String? ?? '',
-      petPhotoPath:
-          map['petPhotoPath'] as String? ?? 'assets/images/barley.jpg',
-      ownerName: map['ownerName'] as String? ?? 'Aygen',
-      ownerId: (map['ownerId'] as String?)?.trim().isNotEmpty == true
-          ? map['ownerId'] as String
-          : ConversationIdentity.ownerIdForLegacyBooking(
-              ownerName: map['ownerName'] as String?,
-              bookingId: map['id'] as String? ?? '',
-            ),
-      serviceTitle: map['serviceTitle'] as String? ?? '',
-      startDate: DateTime.fromMillisecondsSinceEpoch(
-        (map['startDate'] as num?)?.toInt() ?? 0,
-      ),
-      endDate: DateTime.fromMillisecondsSinceEpoch(
-        (map['endDate'] as num?)?.toInt() ?? 0,
-      ),
-      totalPrice: (map['totalPrice'] as num?)?.toDouble() ?? 0.0,
-      careNotes: map['careNotes'] as String? ?? '',
-      status: parsedStatus,
-    );
-  }
+  factory BookingRequest.fromMap(Map<dynamic, dynamic> map) => BookingRequest(
+    id: map['id'] as String,
+    sitterId: map['sitterId'] as String,
+    sitterName: map['sitterName'] as String,
+    sitterPhoto: map['sitterPhoto'] as String,
+    petName: map['petName'] as String,
+    petBreed: map['petBreed'] as String,
+    petPhotoPath: map['petPhotoPath'] as String,
+    ownerName: map['ownerName'] as String,
+    ownerId: map['ownerId'] as String,
+    serviceTitle: map['serviceTitle'] as String,
+    startDate: DateTime.fromMillisecondsSinceEpoch(map['startDate'] as int),
+    endDate: DateTime.fromMillisecondsSinceEpoch(map['endDate'] as int),
+    totalPrice: (map['totalPrice'] as num).toDouble(),
+    careNotes: map['careNotes'] as String,
+    petId: map['petId'] as String,
+    serviceType: ServiceType.values.byName(map['serviceType'] as String),
+    units: map['units'] as int,
+    unitPriceCents: map['unitPriceCents'] as int,
+    serviceFeeCents: map['serviceFeeCents'] as int,
+    createdAt: DateTime.fromMillisecondsSinceEpoch(map['createdAt'] as int),
+    completedAt: map['completedAt'] == null
+        ? null
+        : DateTime.fromMillisecondsSinceEpoch(map['completedAt'] as int),
+    status: BookingStatus.values.byName(map['status'] as String),
+  );
 }
 
 @immutable
@@ -450,7 +541,7 @@ class ChatMessage {
   final String text;
   final String time;
   final bool isMe;
-  final UserRole? senderRole;
+  final UserRole senderRole;
 
   const ChatMessage({
     required this.id,
@@ -458,7 +549,7 @@ class ChatMessage {
     required this.text,
     required this.time,
     required this.isMe,
-    this.senderRole,
+    required this.senderRole,
   });
 
   ChatMessage copyWith({
@@ -486,22 +577,18 @@ class ChatMessage {
       'text': text,
       'time': time,
       'isMe': isMe,
-      'senderRole': senderRole?.name,
+      'senderRole': senderRole.name,
     };
   }
 
   factory ChatMessage.fromMap(Map<dynamic, dynamic> map) {
     return ChatMessage(
-      id: map['id'] as String? ?? '',
-      senderName: map['senderName'] as String? ?? '',
-      text: map['text'] as String? ?? '',
-      time: map['time'] as String? ?? '',
-      isMe: map['isMe'] as bool? ?? false,
-      senderRole: switch (map['senderRole']) {
-        'owner' => UserRole.owner,
-        'sitter' => UserRole.sitter,
-        _ => null,
-      },
+      id: map['id'] as String,
+      senderName: map['senderName'] as String,
+      text: map['text'] as String,
+      time: map['time'] as String,
+      isMe: map['isMe'] as bool,
+      senderRole: UserRole.values.byName(map['senderRole'] as String),
     );
   }
 }
@@ -514,6 +601,10 @@ class NotificationItem {
   final String timeLabel;
   final NotificationType type;
   final bool isRead;
+  final String recipientId;
+  final UserRole recipientRole;
+  final String? relatedRecordId;
+  final DateTime createdAt;
 
   const NotificationItem({
     required this.id,
@@ -522,6 +613,10 @@ class NotificationItem {
     required this.timeLabel,
     required this.type,
     this.isRead = false,
+    required this.recipientId,
+    required this.recipientRole,
+    this.relatedRecordId,
+    required this.createdAt,
   });
 
   NotificationItem copyWith({
@@ -531,6 +626,8 @@ class NotificationItem {
     String? timeLabel,
     NotificationType? type,
     bool? isRead,
+    String? recipientId,
+    UserRole? recipientRole,
   }) {
     return NotificationItem(
       id: id ?? this.id,
@@ -539,6 +636,10 @@ class NotificationItem {
       timeLabel: timeLabel ?? this.timeLabel,
       type: type ?? this.type,
       isRead: isRead ?? this.isRead,
+      recipientId: recipientId ?? this.recipientId,
+      recipientRole: recipientRole ?? this.recipientRole,
+      relatedRecordId: relatedRecordId,
+      createdAt: createdAt,
     );
   }
 
@@ -550,23 +651,24 @@ class NotificationItem {
       'timeLabel': timeLabel,
       'type': type.name,
       'isRead': isRead,
+      'recipientId': recipientId,
+      'recipientRole': recipientRole.name,
+      'relatedRecordId': relatedRecordId,
+      'createdAt': createdAt.millisecondsSinceEpoch,
     };
   }
 
-  factory NotificationItem.fromMap(Map<dynamic, dynamic> map) {
-    final typeName =
-        map['type'] as String? ?? NotificationType.bookingCreated.name;
-    final parsedType = NotificationType.values.firstWhere(
-      (e) => e.name == typeName,
-      orElse: () => NotificationType.bookingCreated,
-    );
-    return NotificationItem(
-      id: map['id'] as String? ?? '',
-      title: map['title'] as String? ?? '',
-      message: map['message'] as String? ?? '',
-      timeLabel: map['timeLabel'] as String? ?? '',
-      type: parsedType,
-      isRead: map['isRead'] as bool? ?? false,
-    );
-  }
+  factory NotificationItem.fromMap(Map<dynamic, dynamic> map) =>
+      NotificationItem(
+        id: map['id'] as String,
+        title: map['title'] as String,
+        message: map['message'] as String,
+        timeLabel: map['timeLabel'] as String,
+        type: NotificationType.values.byName(map['type'] as String),
+        isRead: map['isRead'] as bool,
+        recipientId: map['recipientId'] as String,
+        recipientRole: UserRole.values.byName(map['recipientRole'] as String),
+        relatedRecordId: map['relatedRecordId'] as String?,
+        createdAt: DateTime.fromMillisecondsSinceEpoch(map['createdAt'] as int),
+      );
 }

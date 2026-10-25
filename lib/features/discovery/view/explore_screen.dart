@@ -8,6 +8,7 @@ import '../../../core/widgets/paw_header_actions.dart';
 import '../../../data/models/models.dart';
 import '../controller/discovery_controller.dart';
 import '../widgets/explore_sitter_card.dart';
+import '../widgets/discovery_filter_modal.dart';
 
 class ExploreScreen extends StatelessWidget {
   final DiscoveryController controller;
@@ -33,23 +34,54 @@ class ExploreScreen extends StatelessWidget {
         child: ValueListenableBuilder<DiscoveryFilterState>(
           valueListenable: controller,
           builder: (context, state, _) {
-            return SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(
-                horizontal: AppDimens.paddingLg,
-                vertical: AppDimens.paddingLg,
-              ),
-              child: _ExploreContent(
-                state: state,
-                categories: AppStrings.exploreCategories,
-                controller: controller,
-                onSitterSelected: onSitterSelected,
-                unreadNotifications: unreadNotifications,
-                onNotificationsTap: onNotificationsTap,
-              ),
+            final sitters = state.filteredSitters;
+            return CustomScrollView(
+              key: const PageStorageKey('explore_scroll'),
+              slivers: [
+                _buildHeaderSliver(state),
+                _buildResultsSliver(sitters),
+                const SliverToBoxAdapter(
+                  child: SizedBox(height: AppDimens.p20),
+                ),
+              ],
             );
           },
         ),
       ),
+    );
+  }
+
+  Widget _buildHeaderSliver(DiscoveryFilterState state) {
+    return SliverPadding(
+      padding: const EdgeInsets.symmetric(horizontal: AppDimens.paddingLg),
+      sliver: SliverToBoxAdapter(
+        child: _ExploreContent(
+          state: state,
+          categories: AppStrings.exploreCategories,
+          controller: controller,
+          onSitterSelected: onSitterSelected,
+          unreadNotifications: unreadNotifications,
+          onNotificationsTap: onNotificationsTap,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildResultsSliver(List<SitterListing> sitters) {
+    return SliverPadding(
+      padding: const EdgeInsets.symmetric(horizontal: AppDimens.paddingLg),
+      sliver: sitters.isEmpty
+          ? SliverToBoxAdapter(
+              child: _ExploreEmptyResultsCard(onReset: controller.resetFilters),
+            )
+          : SliverList.separated(
+              itemCount: sitters.length,
+              separatorBuilder: (_, _) => const SizedBox(height: AppDimens.p16),
+              itemBuilder: (_, i) => ExploreSitterCard(
+                sitter: sitters[i],
+                onInspectTap: () => onSitterSelected(sitters[i]),
+              ),
+            ),
     );
   }
 }
@@ -70,25 +102,6 @@ class _ExploreContent extends StatelessWidget {
     required this.unreadNotifications,
     required this.onNotificationsTap,
   });
-
-  Widget _buildSittersList(List<SitterListing> sitters) {
-    if (sitters.isEmpty) {
-      return _ExploreEmptyResultsCard(onReset: controller.resetFilters);
-    }
-    return ListView.separated(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      itemCount: sitters.length,
-      separatorBuilder: (_, _) => const SizedBox(height: AppDimens.p16),
-      itemBuilder: (context, index) {
-        final s = sitters[index];
-        return ExploreSitterCard(
-          sitter: s,
-          onInspectTap: () => onSitterSelected(s),
-        );
-      },
-    );
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -120,7 +133,6 @@ class _ExploreContent extends StatelessWidget {
           selectedCategory: state.selectedCategory,
         ),
         const SizedBox(height: AppDimens.p14),
-        _buildSittersList(sitters),
         const SizedBox(height: AppDimens.p20),
       ],
     );
@@ -161,122 +173,13 @@ class _ExploreTopBar extends StatelessWidget {
         IconButton(
           icon: Icon(Icons.tune, color: colors.primary),
           onPressed: () =>
-              _ExploreFilterModal.show(context, controller: controller),
+              DiscoveryFilterModal.show(context, controller: controller),
           style: _tuneButtonStyle(colors, pawTheme),
         ),
         const SizedBox(width: AppDimens.p8),
         PawHeaderActions(
           unreadCount: unreadNotifications,
           onNotificationsTap: onNotificationsTap,
-        ),
-      ],
-    );
-  }
-}
-
-class _ExploreFilterModal extends StatelessWidget {
-  final DiscoveryController controller;
-
-  const _ExploreFilterModal({required this.controller});
-
-  static Future<void> show(
-    BuildContext context, {
-    required DiscoveryController controller,
-  }) {
-    return showDialog<void>(
-      context: context,
-      barrierColor: context.pawTheme.modalBarrier,
-      builder: (_) => _ExploreFilterModal(controller: controller),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.colors;
-    final pawTheme = context.pawTheme;
-    final textTheme = context.pawTextTheme;
-
-    return ValueListenableBuilder<DiscoveryFilterState>(
-      valueListenable: controller,
-      builder: (context, state, _) {
-        return AlertDialog(
-          backgroundColor: pawTheme.surfaceContainerLowest,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppDimens.heroCardRadius),
-          ),
-          title: Text(
-            AppStrings.advancedFilterTitle,
-            style: textTheme.titleLarge,
-          ),
-          content: _FilterModalContent(state: state, controller: controller),
-          actions: <Widget>[
-            TextButton(
-              onPressed: () {
-                controller.resetFilters();
-                Navigator.of(context).pop();
-              },
-              child: Text(AppStrings.reset, style: textTheme.bodyLarge),
-            ),
-            ElevatedButton(
-              onPressed: () => Navigator.of(context).pop(),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: colors.primary,
-                foregroundColor: colors.onPrimary,
-              ),
-              child: const Text(AppStrings.apply),
-            ),
-          ],
-        );
-      },
-    );
-  }
-}
-
-class _FilterModalContent extends StatelessWidget {
-  final DiscoveryFilterState state;
-  final DiscoveryController controller;
-
-  const _FilterModalContent({required this.state, required this.controller});
-
-  static const List<double> _priceBudgets = <double>[400.0, 750.0, 1500.0];
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.colors;
-    final textTheme = context.pawTextTheme;
-
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: <Widget>[
-        Text(
-          AppStrings.maxPriceLabel(state.maxPrice),
-          style: textTheme.titleMedium,
-        ),
-        const SizedBox(height: AppDimens.p8),
-        Wrap(
-          spacing: AppDimens.p8,
-          children: _priceBudgets.map((budget) {
-            final selected = state.maxPrice == budget;
-            return ChoiceChip(
-              selected: selected,
-              label: Text(AppStrings.budgetChipLabel(budget)),
-              selectedColor: colors.secondaryContainer,
-              onSelected: (_) => controller.setMaxPrice(budget),
-            );
-          }).toList(),
-        ),
-        const SizedBox(height: AppDimens.p16),
-        Text(AppStrings.sortCriteriaTitle, style: textTheme.titleMedium),
-        const SizedBox(height: AppDimens.p8),
-        SwitchListTile(
-          contentPadding: EdgeInsets.zero,
-          title: Text(
-            AppStrings.sortByLowestPriceLabel,
-            style: textTheme.bodyLarge,
-          ),
-          value: state.sortByPriceAsc,
-          onChanged: controller.setSortByPriceAsc,
         ),
       ],
     );

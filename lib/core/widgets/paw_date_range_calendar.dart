@@ -7,20 +7,28 @@ import '../theme/app_typography.dart';
 
 class PawDateRangeCalendar extends StatefulWidget {
   final DateTime initialMonth;
+  final String? storageId;
   final DateTime? rangeStart;
   final DateTime? rangeEnd;
   final List<DateTime> unavailableDates;
   final void Function(DateTime? start, DateTime? end)? onRangeChanged;
   final ValueChanged<DateTime>? onDayTapped;
+  final bool singleDay;
+  final bool exclusiveEnd;
+  final DateTime? minDate;
 
   const PawDateRangeCalendar({
     super.key,
     required this.initialMonth,
+    this.storageId,
     this.rangeStart,
     this.rangeEnd,
     this.unavailableDates = const <DateTime>[],
     this.onRangeChanged,
     this.onDayTapped,
+    this.singleDay = false,
+    this.exclusiveEnd = false,
+    this.minDate,
   });
 
   @override
@@ -39,12 +47,27 @@ class _PawDateRangeCalendarState extends State<PawDateRangeCalendar> {
     );
   }
 
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (widget.storageId != null) {
+      final saved = PageStorage.maybeOf(context)
+          ?.readState(context, identifier: widget.storageId);
+      if (saved is DateTime) _displayedMonth = saved;
+    }
+  }
+
   void _changeMonth(int delta) {
     setState(() {
       _displayedMonth = DateTime(
         _displayedMonth.year,
         _displayedMonth.month + delta,
       );
+      if (widget.storageId != null) {
+        PageStorage.maybeOf(
+          context,
+        )?.writeState(context, _displayedMonth, identifier: widget.storageId);
+      }
     });
   }
 
@@ -53,7 +76,9 @@ class _PawDateRangeCalendarState extends State<PawDateRangeCalendar> {
   }
 
   bool _isUnavailable(DateTime day) {
-    return widget.unavailableDates.any((d) => _isSameDay(d, day));
+    return (widget.minDate != null &&
+            day.isBefore(DateUtils.dateOnly(widget.minDate!))) ||
+        widget.unavailableDates.any((d) => _isSameDay(d, day));
   }
 
   bool _rangeIncludesUnavailable(DateTime start, DateTime end) {
@@ -61,7 +86,8 @@ class _PawDateRangeCalendarState extends State<PawDateRangeCalendar> {
     final lastDay = DateUtils.dateOnly(end);
     return widget.unavailableDates.any((date) {
       final day = DateUtils.dateOnly(date);
-      return !day.isBefore(firstDay) && !day.isAfter(lastDay);
+      return !day.isBefore(firstDay) &&
+          (widget.exclusiveEnd ? day.isBefore(lastDay) : !day.isAfter(lastDay));
     });
   }
 
@@ -70,10 +96,26 @@ class _PawDateRangeCalendarState extends State<PawDateRangeCalendar> {
       widget.onDayTapped!(day);
       return;
     }
-    if (_isUnavailable(day) || widget.onRangeChanged == null) return;
+    if (widget.onRangeChanged == null) return;
+    if (widget.minDate != null &&
+        day.isBefore(DateUtils.dateOnly(widget.minDate!))) {
+      return;
+    }
+    if (widget.singleDay) {
+      if (!_isUnavailable(day)) {
+        widget.onRangeChanged!(day, DateTime(day.year, day.month, day.day + 1));
+      }
+      return;
+    }
 
     final start = widget.rangeStart;
     final end = widget.rangeEnd;
+    final allowedCheckout =
+        widget.exclusiveEnd &&
+        start != null &&
+        end == null &&
+        day.isAfter(start);
+    if (_isUnavailable(day) && !allowedCheckout) return;
     if (start == null || end != null) {
       widget.onRangeChanged!(day, null);
       return;

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/constants/app_dimens.dart';
+import '../../../core/widgets/async_action_builder.dart';
 import '../../../core/constants/app_strings.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/paw_header_actions.dart';
@@ -32,6 +33,7 @@ class ProfileScreen extends StatelessWidget {
       backgroundColor: pawTheme.background,
       body: SafeArea(
         child: SingleChildScrollView(
+          key: const PageStorageKey('profile_scroll'),
           padding: const EdgeInsets.symmetric(
             horizontal: AppDimens.paddingLg,
             vertical: AppDimens.paddingLg,
@@ -86,7 +88,7 @@ class _ProfileScreenContent extends StatelessWidget {
         const SizedBox(height: AppDimens.p8),
         ProfileSettingsList(
           onNotificationsTap: onNotificationsTap,
-          onToggleRole: controller.toggleRole,
+          onToggleRole: () => performUiAction(context, controller.toggleRole),
           onPaymentTap: () => ProfileInfoModal.showPaymentMethods(context),
           onPrivacyTap: () => ProfileInfoModal.showPrivacySecurity(context),
           onHelpTap: () => ProfileInfoModal.showHelpSupport(context),
@@ -112,7 +114,7 @@ class _ReactiveProfileSummary extends StatelessWidget {
     return ValueListenableBuilder<int>(
       valueListenable: controller,
       builder: (context, _, _) {
-        return ValueListenableBuilder<Dog>(
+        return ValueListenableBuilder<Dog?>(
           valueListenable: petsController,
           builder: (context, dog, _) => ProfileUserSummaryCard(
             userName: controller.activeDisplayName,

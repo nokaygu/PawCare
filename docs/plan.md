@@ -90,14 +90,14 @@ Bu doküman; `docs/project.md`, `docs/architecture.md`, `docs/skills.md` ve `doc
 ## FAZ 7 & FAZ 8: Fonksiyonel İyileştirmeler, `AppStrings` ve UX Tekrarlarının Temizliği (`eksiklikler.md`) — [TAMAMLANDI]
 
 - **Adım 7.1:** Rol değişiminde Profil (`Aygen Y.` vs `Ayşe Yılmaz`) ve Ana Sayfa karşılama metinlerinin dinamik senkronizasyonu.
-- **Adım 7.2:** Köpeklerim ve Ana Sayfa ekranlarında "Profili Düzenle" (`EditDogProfileModal`), "Yeni Köpek Ekle" (`AddDogModal`), QR Dijital Kimlik (`MicrochipIdentityModal`) ve çoklu köpek seçici (`DogSelectorChipsRow`) entegrasyonu.
+- **Adım 7.2:** Köpeklerim ve Ana Sayfa ekranlarında "Profili Düzenle" (`EditDogProfileModal`), "Yeni Köpek Ekle" (`AddDogModal`), Metin Mikroçip Kimliği (`MicrochipIdentityModal`) ve çoklu köpek seçici (`DogSelectorChipsRow`) entegrasyonu.
 - **Adım 7.3:** Hizmet Veren panelinde ilan düzenleme (`_EditSitterListingModal`), müşteri değerlendirmeleri listesi (`_ReviewsListSection`), dinamik kazanç/aktif konuk hesaplaması ve `BookingRequest` içinde köpek fotoğrafı (`petPhotoPath`) ile sahip adının (`ownerName`) dinamik gösterimi.
-- **Adım 7.4:** Keşfet ekranında gelişmiş bütçe ve sıralama filtre modalı (`_ExploreFilterModal`) ve arama/kategoriye duyarlı dinamik sonuç başlığı (`_ExploreCountBanner`).
+- **Adım 7.4:** Keşfet ekranında gelişmiş bütçe ve sıralama filtre modalı (`DiscoveryFilterModal`) ve arama/kategoriye duyarlı dinamik sonuç başlığı (`_ExploreCountBanner`).
 - **Adım 7.5:** Profil ekranında hesap düzenleme (`EditUserProfileModal`) ve Ödeme Yöntemleri / Gizlilik & Güvenlik / Yardım & Destek modalları (`ProfileInfoModal`).
 - **Adım 7.6:** Alt navigasyon barıyla mükerrer olan bölümlerin (`OwnerSearchAndCategoriesSection` / `Popüler Hizmetler`, `SitterQuickManagementSection` / `Hızlı Yönetim` ve sağ üst bar mükerrer profil ikonu) kaldırılması ve tüm UI metinlerinin `AppStrings` sınıfına taşınması.
 
 
-## FAZ 9: Kesinti Sonrası Onarım ve 21 Teknik Denetim Maddesi — [3.2 / 3.3 YENİDEN AÇIK]
+## FAZ 9: Kesinti Sonrası Onarım ve 21 Teknik Denetim Maddesi — [TAMAMLANDI]
 
 1. Dört bozuk merkezi Dart dosyasını gerçek satır sonları ve doğru string kaçışlarıyla onar.
 2. Yaşam döngüsü, seed/fallback bellek kullanımı, fotoğraf temizliği ve controller önbelleklerini düzelt (`1.1–2.4`).
@@ -108,4 +108,37 @@ Bu doküman; `docs/project.md`, `docs/architecture.md`, `docs/skills.md` ve `doc
 
 Güncel madde sonuçları [`eksiklikler.md`](../eksiklikler.md), doğrulama sonuçları [`yapilanlar.md`](../yapilanlar.md) içinde tutulur.
 
-**Yeniden doğrulama (25 Ekim 2026):** 19 madde doğrulandı; 3.2 profil/ilan adı senkronizasyonu ve 3.3 farklı sahiplerde sohbet ayrımı kısmi olduğu için yeniden açıldı. Mevcut 40 test başarılı, analiz ve biçimlendirme temiz; eksik iki senaryo mevcut testlerde kapsanmıyor. Kanıt ve kalan işler `eksiklikler.md` bölüm 7 ve `yapilanlar.md` içinde.
+**Önceki denetim doğrulaması:** 21/21 denetim maddesi tamamlandı; 61 test başarılı, analiz ve Dart biçimlendirmesi temiz. Yeniden açılan 3.2/3.3 için kullanıcıya görünen ilan adı, iki taraflı sohbet, kimlik değişimi, gerçek Hive kalıcılığı ve belirsiz veri geçişi testleri eklendi. Bu tarihli kapsamın kanıtları `yapilanlar.md` içindedir; yeni denetim aşağıdadır.
+
+## FAZ 10: Yeni 50 Maddelik Denetim — DEVAM EDİYOR
+
+- [x] **10.1:** B01/B02/B03/B11/B14/B17 — Hesap/pet/bildirim sınırları, bakıcı hesabı ve ilan taslağı, güvenli boş veri ve gerçek olay zamanı. 71 test başarılı, analiz temiz.
+- [x] **10.2:** Hizmet süresi/teklif/durum geçişi/onay ve güvenli yazımlar.
+- [x] **10.3:** Ana sayfa/sağlık özeti ve zaman geçişleri.
+- [ ] **10.4:** Bozuk veri/açılış/picker uygulaması ve kalıcı testler tamamlandı. F02 Android süreç kaybı kabulü geçti; yalnız F01/F03 Apple cihaz/sandbox kabulleri açık.
+- [x] **10.5:** Okuma/build/bellek uygulamaları, kalıcı testler ve C03/C05/C06 Android native profile kabulleri tamamlandı; Adım 11 ölçümleri kaydedildi.
+- [ ] **10.6:** Kullanıcı akışları ve bakım tamamlandı; F04 gerçek yayın sertifikasıyla paket doğrulaması açık.
+
+Güncel toplam: **47 tamamlandı / 3 açık**. Her adımın kanıtı `eksiklikler.md` ve `yapilanlar.md` ile birlikte güncellenir.
+
+
+<!-- audit-progress:start -->
+
+**Yeni denetim güncel durumu: 47/50 tamamlandı, 3 kabul bekliyor. 171 VM testi başarılı; 3 Chrome senaryosu doğrulandı; Flutter analizi temiz.**
+
+10.5 native performans kabulü tamamlandı. 10.4 yalnız F01/F03 Apple cihaz/sandbox kabulünü, 10.6 F04 gerçek yayın sertifikası doğrulamasını bekliyor. Android F02 süreç kaybı kabulü geçti.
+
+Chrome başlangıç takip düzeltmesi tamamlandı; asıl 50 maddelik listenin F01/F03/F04 dış kabulleri aynı kaldı.
+
+Ayrıntılı görev/kabul durumu: [eksiklikler.md](../eksiklikler.md).
+
+<!-- audit-progress:end -->
+
+
+## Chrome başlangıç takip işi
+
+- [x] Build/araç temizliği ve kilitli bağımlılıkların yeniden hazırlanması; kullanıcı IndexedDB verilerinin korunması.
+- [x] Web başlangıcında native Platform/dizin çağrılarının engellenmesi.
+- [x] Temiz açılış ve mevcut kayıtla yeniden açılışın gerçek Chromiumda doğrulanması; 171 VM regresyonunun korunması.
+
+Standart SDK Chrome test koşucusunun yükleme sorunu ile uygulamanın tarayıcı kontrolü ayrı kaydedildi; ayrıntı `yapilanlar.md` içindedir.

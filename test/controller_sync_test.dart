@@ -81,8 +81,8 @@ void main() {
   testWidgets('Cancellation refreshes home and provider through AppShell', (
     tester,
   ) async {
-    final booking = _todayBooking();
-    await const BookingRepository().addBooking(booking);
+    final booking = _todayBooking().copyWith(status: BookingStatus.pending);
+    await BookingRepository().addBooking(booking);
     final router = AppRouter();
     final theme = ThemeController();
     await tester.pumpWidget(
@@ -92,7 +92,7 @@ void main() {
       ),
     );
     final home = tester.widget<OwnerHomeScreen>(find.byType(OwnerHomeScreen));
-    expect(home.homeController.activeConfirmedBooking?.id, booking.id);
+    expect(home.homeController.activeConfirmedBooking, isNull);
 
     router.setOwnerNavIndex(3);
     await tester.pump();
@@ -101,6 +101,10 @@ void main() {
     );
     await requests.controller.cancelBooking(booking);
     expect(home.homeController.activeConfirmedBooking, isNull);
+    expect(
+      requests.controller.value.firstWhere((b) => b.id == booking.id).status,
+      BookingStatus.cancelled,
+    );
 
     await router.setRole(UserRole.sitter);
     await tester.pump();
@@ -217,8 +221,8 @@ void main() {
       await auth.signUp(
         name: 'Deniz Kaya',
         email: 'deniz@example.com',
-        password: 'secret',
-        confirmPassword: 'secret',
+        password: 'secret123',
+        confirmPassword: 'secret123',
         role: UserRole.owner,
       ),
       isTrue,
@@ -233,8 +237,8 @@ void main() {
       await auth.signUp(
         name: 'Ece Kaya',
         email: 'ece@example.com',
-        password: 'secret',
-        confirmPassword: 'secret',
+        password: 'secret123',
+        confirmPassword: 'secret123',
         role: UserRole.sitter,
       ),
       isTrue,
@@ -263,7 +267,7 @@ void main() {
       await const SitterRepository().saveSitter(
         sitter.copyWith(unavailableDates: <DateTime>[start]),
       );
-      final bookingsBefore = const BookingRepository().getAllBookings().length;
+      final bookingsBefore = BookingRepository().getAllBookings().length;
       await expectLater(
         controller.submitBookingRequest(
           sitter: sitter,
@@ -276,7 +280,7 @@ void main() {
         ),
         throwsArgumentError,
       );
-      expect(const BookingRepository().getAllBookings().length, bookingsBefore);
+      expect(BookingRepository().getAllBookings().length, bookingsBefore);
     },
   );
 }

@@ -1,7 +1,25 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
+}
+
+// Local key.properties is optional for debug builds. Release never uses debug keys.
+val releaseProperties = Properties().apply {
+    val propertiesFile = rootProject.file("key.properties")
+    if (propertiesFile.exists()) propertiesFile.inputStream().use { load(it) }
+}
+fun releaseValue(property: String, environment: String): String? =
+    providers.environmentVariable(environment).orNull ?: releaseProperties.getProperty(property)
+val releaseStoreFile = releaseValue("storeFile", "PAWCARE_RELEASE_STORE_FILE")
+val releaseStorePassword = releaseValue("storePassword", "PAWCARE_RELEASE_STORE_PASSWORD")
+val releaseKeyAlias = releaseValue("keyAlias", "PAWCARE_RELEASE_KEY_ALIAS")
+val releaseKeyPassword = releaseValue("keyPassword", "PAWCARE_RELEASE_KEY_PASSWORD")
+val releaseConfigured = listOf(releaseStoreFile, releaseStorePassword, releaseKeyAlias, releaseKeyPassword).all { !it.isNullOrBlank() }
+if (gradle.startParameter.taskNames.any { it.contains("release", ignoreCase = true) } && !releaseConfigured) {
+    throw GradleException("Release signing is missing. Configure android/key.properties or PAWCARE_RELEASE_* environment variables.")
 }
 
 android {
@@ -15,7 +33,6 @@ android {
     }
 
     defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
         applicationId = "com.pawcare.paw_care"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
@@ -29,11 +46,19 @@ android {
         versionName = flutter.versionName
     }
 
+    signingConfigs {
+        create("release") {
+            if (releaseConfigured) {
+                storeFile = rootProject.file(releaseStoreFile!!)
+                storePassword = releaseStorePassword
+                keyAlias = releaseKeyAlias
+                keyPassword = releaseKeyPassword
+            }
+        }
+    }
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.getByName("release")
         }
     }
 }

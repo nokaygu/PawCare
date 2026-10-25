@@ -134,7 +134,10 @@ class _SitterCategoryRatingRow extends StatelessWidget {
     final colors = context.colors;
     final pawTheme = context.pawTheme;
     final textTheme = context.pawTextTheme;
-    return Row(
+    return Wrap(
+      spacing: AppDimens.p8,
+      runSpacing: AppDimens.p4,
+      crossAxisAlignment: WrapCrossAlignment.center,
       children: <Widget>[
         Container(
           padding: const EdgeInsets.symmetric(
@@ -150,7 +153,6 @@ class _SitterCategoryRatingRow extends StatelessWidget {
             style: textTheme.labelSmall?.copyWith(color: colors.primary),
           ),
         ),
-        const Spacer(),
         Icon(Icons.star, size: AppDimens.iconSm, color: pawTheme.starGold),
         const SizedBox(width: AppDimens.p4),
         Text(
@@ -292,7 +294,11 @@ class _PetSelectionRow extends StatelessWidget {
       children: <Widget>[
         CircleAvatar(
           radius: AppDimens.avatarRadiusSm,
-          backgroundImage: PawImageProvider.resolve(dog.photoPath),
+          backgroundImage: PawImageProvider.avatar(
+            context,
+            dog.photoPath,
+            radius: AppDimens.avatarRadiusSm,
+          ),
         ),
         const SizedBox(width: AppDimens.p12),
         Expanded(

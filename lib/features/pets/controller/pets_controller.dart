@@ -1,32 +1,47 @@
-import 'package:flutter/foundation.dart';
-
 import '../../../core/constants/app_strings.dart';
+import '../../../core/utils/lifecycle_notifier.dart';
+import '../../../core/utils/record_id.dart';
 import '../../../core/utils/image_storage_service.dart';
 import '../../../data/models/models.dart';
+import '../../../data/models/calendar_date.dart';
+import '../../../data/models/health_summary.dart';
 import '../../../data/repositories/booking_repository.dart';
 import '../../../data/repositories/dog_repository.dart';
+import '../../../data/repositories/pet_photo_recovery.dart';
+import '../../../data/repositories/settings_repository.dart';
+import '../../../data/repositories/sitter_repository.dart';
 import '../../notifications/controller/notifications_controller.dart';
 
-class PetsController extends ValueNotifier<Dog> {
+class PetsController extends LifecycleNotifier<Dog?> {
   final DogRepository _dogRepository;
   final BookingRepository _bookingRepository;
   final ImageStorageService _imageStorageService;
   final NotificationsController? notificationsController;
   List<Dog> _allDogs;
+  final DateTime Function() _now;
+  String? lastWarning;
+  late HealthSummary healthSummary;
+  late final PetPhotoRecovery _photoRecovery = PetPhotoRecovery(
+    storage: _imageStorageService,
+    dogs: _dogRepository,
+    bookings: _bookingRepository,
+  );
 
   factory PetsController({
     DogRepository? dogRepository,
     BookingRepository? bookingRepository,
     ImageStorageService? imageStorageService,
     NotificationsController? notificationsController,
+    DateTime Function()? now,
   }) {
     final repository = dogRepository ?? const DogRepository();
     return PetsController._(
       repository,
-      bookingRepository ?? const BookingRepository(),
+      bookingRepository ?? BookingRepository(),
       imageStorageService ?? ImageStorageService(),
       notificationsController,
       repository.getAllDogs(),
+      now ?? DateTime.now,
     );
   }
 
@@ -36,26 +51,52 @@ class PetsController extends ValueNotifier<Dog> {
     this._imageStorageService,
     this.notificationsController,
     List<Dog> dogs,
+    this._now,
   ) : _allDogs = List<Dog>.unmodifiable(dogs),
-      super(_dogRepository.getCurrentDog(dogs: dogs));
+      super(_dogRepository.findCurrentDog(dogs: dogs)) {
+    healthSummary = HealthSummary.forDog(value, _now());
+  }
 
-  Dog get currentDog => value;
+  @override
+  set value(Dog? dog) {
+    if (isDisposed ||
+        (dog != null &&
+            dog.ownerId != const SettingsRepository().getOwnerId())) {
+      return;
+    }
+    healthSummary = HealthSummary.forDog(dog, _now());
+    super.value = dog;
+  }
+
+  void refreshTime() {
+    healthSummary = HealthSummary.forDog(value, _now());
+    notifyListeners();
+  }
+
+  Dog get currentDog => value ?? (throw StateError('No selected pet'));
+  bool get hasDog => value != null;
 
   List<Dog> get allDogs => _allDogs;
 
   void refresh() {
     _allDogs = List<Dog>.unmodifiable(_dogRepository.getAllDogs());
-    value = _dogRepository.getCurrentDog(dogs: _allDogs);
+    value = _dogRepository.findCurrentDog(dogs: _allDogs);
   }
 
   Future<void> selectDog(String dogId) async {
     final dog = _allDogs.where((dog) => dog.id == dogId).firstOrNull;
     if (dog == null) return;
     await _dogRepository.setActiveDog(dogId);
+    if (isDisposed || const SettingsRepository().getOwnerId() != dog.ownerId) {
+      return;
+    }
     value = dog;
   }
 
   void _cacheDog(Dog dog, {bool makeActive = false}) {
+    if (isDisposed || dog.ownerId != const SettingsRepository().getOwnerId()) {
+      return;
+    }
     final existingIndex = _allDogs.indexWhere((entry) => entry.id == dog.id);
     final dogs = List<Dog>.of(_allDogs);
     if (existingIndex == -1) {
@@ -64,7 +105,7 @@ class PetsController extends ValueNotifier<Dog> {
       dogs[existingIndex] = dog;
     }
     _allDogs = List<Dog>.unmodifiable(dogs);
-    if (makeActive || value.id == dog.id) {
+    if (makeActive || value?.id == dog.id) {
       value = dog;
     } else {
       notifyListeners();
@@ -72,52 +113,84 @@ class PetsController extends ValueNotifier<Dog> {
   }
 
   Future<bool> pickAndUpdatePhoto() async {
-    final dogId = value.id;
-    final newPath = await _imageStorageService.pickAndSavePetPhoto();
-    if (newPath == null) return false;
-    final dog = _allDogs.firstWhere((entry) => entry.id == dogId);
-    await _replacePhoto(dog, newPath, discardOnSaveFailure: true);
-    return true;
+    if (!hasDog || isDisposed) return false;
+    return runExclusive(() async {
+      lastWarning = null;
+      final dogId = currentDog.id;
+      final ownerId = currentDog.ownerId;
+      final operationId = await _photoRecovery.begin(currentDog);
+      String? newPath;
+      try {
+        newPath = await _imageStorageService.pickAndSavePetPhoto();
+        if (newPath == null) {
+          await _photoRecovery.complete(operationId);
+          return false;
+        }
+        await _photoRecovery.stage(operationId, newPath);
+        if (isDisposed || const SettingsRepository().getOwnerId() != ownerId) {
+          if (!_dogRepository.isPhotoReferenced(newPath) &&
+              !_bookingRepository.isPhotoReferenced(newPath) &&
+              !const SitterRepository().isPhotoReferenced(newPath)) {
+            await _imageStorageService.deletePetPhoto(newPath);
+          }
+          await _photoRecovery.complete(operationId);
+          return false;
+        }
+        final dog = _allDogs.firstWhere((entry) => entry.id == dogId);
+        await _replacePhoto(dog, newPath);
+        try {
+          await _photoRecovery.complete(operationId);
+        } catch (_) {
+          lastWarning = AppStrings.photoIntentCleanupFailed;
+        }
+        return true;
+      } catch (_) {
+        if (newPath != null &&
+            !_dogRepository.isPhotoReferenced(newPath) &&
+            !_bookingRepository.isPhotoReferenced(newPath) &&
+            !const SitterRepository().isPhotoReferenced(newPath)) {
+          await _imageStorageService.deletePetPhoto(newPath);
+        }
+        await _photoRecovery.complete(operationId);
+        rethrow;
+      }
+    });
   }
 
   Future<void> updatePhotoPath(String path) async {
-    await _replacePhoto(value, path);
+    await runExclusive(() => _replacePhoto(currentDog, path));
   }
 
-  Future<void> _replacePhoto(
-    Dog dog,
-    String path, {
-    bool discardOnSaveFailure = false,
-  }) async {
+  Future<void> _replacePhoto(Dog dog, String path) async {
     if (dog.photoPath == path) return;
     final updated = dog.copyWith(photoPath: path);
-    try {
-      await _dogRepository.saveDog(updated);
-    } catch (_) {
-      if (discardOnSaveFailure) {
-        await _imageStorageService.deletePetPhoto(path);
-      }
-      rethrow;
-    }
+    await _dogRepository.saveDog(updated);
     _cacheDog(updated);
     final photoStillUsed =
-        _allDogs.any((entry) => entry.photoPath == dog.photoPath) ||
-        _bookingRepository.getAllBookings().any(
-          (booking) => booking.petPhotoPath == dog.photoPath,
-        );
+        _dogRepository.isPhotoReferenced(dog.photoPath) ||
+        _bookingRepository.isPhotoReferenced(dog.photoPath) ||
+        const SitterRepository().isPhotoReferenced(dog.photoPath);
     if (!photoStillUsed) {
-      await _imageStorageService.deletePetPhoto(dog.photoPath);
+      try {
+        await _imageStorageService.deletePetPhoto(dog.photoPath);
+      } catch (_) {
+        lastWarning = AppStrings.photoCleanupFailed;
+      }
     }
   }
 
   Future<void> updateDog(Dog updated) async {
-    await _dogRepository.saveDog(updated);
-    _cacheDog(updated);
-    await notificationsController?.addNotification(
-      title: AppStrings.notifDogUpdatedTitle,
-      message: AppStrings.notifDogUpdatedBody(updated.name),
-      type: NotificationType.vaccineReminder,
-    );
+    await runExclusive(() async {
+      await _dogRepository.saveDog(updated);
+      _cacheDog(updated);
+      await _notify(
+        title: AppStrings.notifDogUpdatedTitle,
+        message: AppStrings.notifDogUpdatedBody(updated.name),
+        type: NotificationType.vaccineReminder,
+        recipientId: updated.ownerId,
+        recipientRole: UserRole.owner,
+      );
+    });
   }
 
   Future<void> addNewDog({
@@ -131,92 +204,113 @@ class PetsController extends ValueNotifier<Dog> {
     required String behaviorNote,
     required String clinicName,
     required String clinicPhone,
+    String nutritionPlan = '',
+    String veterinarianName = '',
   }) async {
-    final trimmedName = name.trim().isEmpty
-        ? AppStrings.defaultNewDogName
-        : name.trim();
-    final newId = 'dog_${DateTime.now().microsecondsSinceEpoch}';
-    final newDog = Dog(
-      id: newId,
-      name: trimmedName,
-      breed: breed.trim().isEmpty ? AppStrings.fallbackBreed : breed.trim(),
-      ageYears: ageYears <= 0 ? 2 : ageYears,
-      weightKg: weightKg <= 0 ? 18.0 : weightKg,
-      gender: gender.trim().isEmpty ? AppStrings.fallbackGender : gender.trim(),
-      microchip: microchip.trim().isEmpty
-          ? AppStrings.defaultNewDogMicrochip
-          : microchip.trim(),
-      photoPath: 'assets/images/barley.jpg',
-      allergyNote: allergyNote.trim().isEmpty
-          ? AppStrings.fallbackAllergy
-          : allergyNote.trim(),
-      behaviorNote: behaviorNote.trim().isEmpty
-          ? AppStrings.fallbackBehavior
-          : behaviorNote.trim(),
-      clinicName: clinicName.trim().isEmpty
-          ? AppStrings.defaultNewDogClinic
-          : clinicName.trim(),
-      clinicPhone: clinicPhone.trim().isEmpty
-          ? AppStrings.defaultNewDogPhone
-          : clinicPhone.trim(),
-      vaccinations: <Vaccination>[
-        Vaccination(
-          id: 'v_init_${DateTime.now().microsecondsSinceEpoch}',
-          title: AppStrings.initialVaccineTitle,
-          dueDate: AppStrings.initialVaccineDueDate,
-          status: VaccineStatus.upcoming,
-          vetName: AppStrings.defaultVaccineVet,
-        ),
-      ],
-    );
-    await _dogRepository.saveDog(newDog);
-    await _dogRepository.setActiveDog(newId);
-    _cacheDog(newDog, makeActive: true);
-    await notificationsController?.addNotification(
-      title: AppStrings.notifDogAddedTitle,
-      message: AppStrings.notifDogAddedBody(trimmedName, newDog.breed),
-      type: NotificationType.vaccineReminder,
-    );
+    await runExclusive(() async {
+      final trimmedName = name.trim();
+      final newId = RecordId.create('dog');
+      final newDog = Dog(
+        id: newId,
+        ownerId: const SettingsRepository().getOwnerId(),
+        name: trimmedName,
+        breed: breed.trim(),
+        ageYears: ageYears,
+        weightKg: weightKg,
+        gender: gender.trim(),
+        microchip: microchip.trim(),
+        photoPath: '',
+        allergyNote: allergyNote.trim(),
+        behaviorNote: behaviorNote.trim(),
+        clinicName: clinicName.trim(),
+        clinicPhone: clinicPhone.trim(),
+        nutritionPlan: nutritionPlan.trim(),
+        veterinarianName: veterinarianName.trim(),
+        vaccinations: const [],
+      );
+      await _dogRepository.saveDog(newDog);
+      await _dogRepository.setActiveDog(newId);
+      _cacheDog(newDog, makeActive: true);
+      await _notify(
+        title: AppStrings.notifDogAddedTitle,
+        message: AppStrings.notifDogAddedBody(trimmedName, newDog.breed),
+        type: NotificationType.vaccineReminder,
+        recipientId: newDog.ownerId,
+        recipientRole: UserRole.owner,
+      );
+    });
   }
 
   Future<void> addVaccination({
     required String title,
-    required String dueDate,
+    required DateTime dueAt,
     required String vetName,
   }) async {
-    if (title.trim().isEmpty) return;
-    final newVaccine = Vaccination(
-      id: 'v_${DateTime.now().microsecondsSinceEpoch}',
-      title: title.trim(),
-      dueDate: dueDate.trim().isEmpty
-          ? AppStrings.fallbackVaccineDueDate
-          : dueDate.trim(),
-      status: VaccineStatus.upcoming,
-      vetName: vetName.trim().isEmpty
-          ? AppStrings.defaultVaccineVet
-          : vetName.trim(),
-    );
-    final updatedDog = await _dogRepository.addVaccination(
-      value.id,
-      newVaccine,
-    );
-    _cacheDog(updatedDog);
-    await notificationsController?.addNotification(
-      title: AppStrings.notifVaccineAddedTitle,
-      message: AppStrings.notifVaccineAddedBody(
-        updatedDog.name,
-        newVaccine.title,
-        newVaccine.dueDate,
-      ),
-      type: NotificationType.vaccineReminder,
-    );
+    await runExclusive(() async {
+      if (title.trim().isEmpty) {
+        throw ArgumentError(AppStrings.authErrorEmptyFields);
+      }
+      if (dueAt.year < 1900 || dueAt.year > 2200) {
+        throw ArgumentError(AppStrings.invalidVaccineDate);
+      }
+      final due = CalendarDate.day(dueAt);
+      final newVaccine = Vaccination(
+        id: RecordId.create('v'),
+        title: title.trim(),
+        dueAt: due,
+        status: due.isBefore(CalendarDate.day(_now()))
+            ? VaccineStatus.overdue
+            : VaccineStatus.upcoming,
+        vetName: vetName.trim(),
+      );
+      final updatedDog = await _dogRepository.addVaccination(
+        currentDog.id,
+        newVaccine,
+      );
+      _cacheDog(updatedDog);
+      await _notify(
+        title: AppStrings.notifVaccineAddedTitle,
+        message: AppStrings.notifVaccineAddedBody(
+          updatedDog.name,
+          newVaccine.title,
+          newVaccine.dueDate,
+        ),
+        type: NotificationType.vaccineReminder,
+        recipientId: updatedDog.ownerId,
+        recipientRole: UserRole.owner,
+      );
+    });
+  }
+
+  Future<void> _notify({
+    required String title,
+    required String message,
+    required NotificationType type,
+    required String recipientId,
+    required UserRole recipientRole,
+  }) async {
+    lastWarning = null;
+    try {
+      await notificationsController?.addNotification(
+        title: title,
+        message: message,
+        type: type,
+        recipientId: recipientId,
+        recipientRole: recipientRole,
+      );
+    } catch (_) {
+      lastWarning = AppStrings.notificationDeliveryFailed;
+    }
   }
 
   Future<void> toggleVaccinationStatus(String vaccineId) async {
-    final updatedDog = await _dogRepository.toggleVaccinationStatus(
-      value.id,
-      vaccineId,
-    );
-    _cacheDog(updatedDog);
+    await runExclusive(() async {
+      final updatedDog = await _dogRepository.toggleVaccinationStatus(
+        currentDog.id,
+        vaccineId,
+        at: _now(),
+      );
+      _cacheDog(updatedDog);
+    });
   }
 }

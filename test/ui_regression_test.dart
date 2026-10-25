@@ -55,7 +55,7 @@ void main() {
     expect(controller.value.sortByPriceAsc, isFalse);
     expect(
       controller.value.maxPrice,
-      (const DiscoveryFilterState(allSitters: [])).maxPrice,
+      (DiscoveryFilterState(allSitters: const [])).maxPrice,
     );
     expect(
       tester.widget<TextField>(find.byType(TextField)).controller!.text,

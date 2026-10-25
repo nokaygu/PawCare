@@ -75,7 +75,7 @@ void main() {
     addTearDown(controller.dispose);
     await controller.addVaccination(
       title: 'New vaccine',
-      dueDate: '1 January 2027',
+      dueAt: DateTime(2027, 1, 1),
       vetName: 'Vet',
     );
     final vaccine = controller.currentDog.vaccinations.first;
@@ -139,7 +139,7 @@ void main() {
     'Photo snapshots referenced by persisted bookings remain available',
     () async {
       const dogs = DogRepository();
-      const bookings = BookingRepository();
+      final bookings = BookingRepository();
       await dogs.saveDog(
         HiveSeedData.initialDog.copyWith(photoPath: '/booked_photo.jpg'),
       );
@@ -201,7 +201,7 @@ void main() {
     () async {
       const repository = DogRepository();
       await repository.saveDog(
-        HiveSeedData.initialDog.copyWith(id: 'dog_second'),
+        HiveSeedData.initialDog.copyWith(id: 'dog_second', microchip: ''),
       );
       final images = _RecordingImageStorageService()
         ..pendingSelection = Completer<String?>();

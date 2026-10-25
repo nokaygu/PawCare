@@ -3,6 +3,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 
 import '../../../core/constants/app_dimens.dart';
+import '../../../core/widgets/async_action_builder.dart';
 import '../../../core/constants/app_strings.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../data/models/models.dart';
@@ -87,20 +88,61 @@ class _NotificationsContent extends StatelessWidget {
       children: <Widget>[
         _NotificationsHeader(controller: controller),
         const SizedBox(height: AppDimens.p14),
-        Expanded(
-          child: ListView.separated(
-            itemCount: items.length,
-            separatorBuilder: (_, _) => const SizedBox(height: AppDimens.p10),
-            itemBuilder: (context, index) {
-              final item = items[index];
-              return NotificationTile(
-                item: item,
-                onTap: () => controller.markAsRead(item.id),
-              );
-            },
-          ),
+        if (controller.showingArchive) _buildArchivePagination(context),
+        Expanded(child: _buildItems(context)),
+      ],
+    );
+  }
+
+  Widget _buildArchivePagination(BuildContext context) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        IconButton(
+          tooltip: AppStrings.previousPage,
+          onPressed: !controller.isBusy && controller.archiveOffset > 0
+              ? () => performUiAction(
+                  context,
+                  () => controller.showArchived(
+                    offset: controller.archiveOffset - 50,
+                  ),
+                )
+              : null,
+          icon: const Icon(Icons.chevron_left),
+        ),
+        const Text(AppStrings.archivedNotifications),
+        IconButton(
+          tooltip: AppStrings.nextPage,
+          onPressed: !controller.isBusy && controller.archiveHasMore
+              ? () => performUiAction(
+                  context,
+                  () => controller.showArchived(
+                    offset: controller.archiveOffset + 50,
+                  ),
+                )
+              : null,
+          icon: const Icon(Icons.chevron_right),
         ),
       ],
+    );
+  }
+
+  Widget _buildItems(BuildContext context) {
+    return ListView.separated(
+      itemCount: items.length,
+      separatorBuilder: (_, _) => const SizedBox(height: AppDimens.p10),
+      itemBuilder: (context, index) {
+        final item = items[index];
+        return NotificationTile(
+          item: item,
+          onTap: controller.showingArchive
+              ? null
+              : () => performUiAction(
+                  context,
+                  () => controller.markAsRead(item.id),
+                ),
+        );
+      },
     );
   }
 }
@@ -122,13 +164,15 @@ class _NotificationsHeader extends StatelessWidget {
         Expanded(
           child: Text(AppStrings.notifications, style: textTheme.titleLarge),
         ),
-        TextButton(
-          onPressed: controller.markAllAsRead,
-          child: Text(
-            AppStrings.markAllRead,
-            style: textTheme.labelSmall?.copyWith(color: colors.primary),
+        _buildArchiveToggle(context),
+        if (!controller.showingArchive)
+          TextButton(
+            onPressed: () => performUiAction(context, controller.markAllAsRead),
+            child: Text(
+              AppStrings.markAllRead,
+              style: textTheme.labelSmall?.copyWith(color: colors.primary),
+            ),
           ),
-        ),
         IconButton(
           onPressed: () => Navigator.of(context).pop(),
           icon: Icon(
@@ -142,6 +186,28 @@ class _NotificationsHeader extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildArchiveToggle(BuildContext context) {
+    return IconButton(
+      tooltip: controller.showingArchive
+          ? AppStrings.notifications
+          : AppStrings.archivedNotifications,
+      onPressed: controller.isBusy
+          ? null
+          : () {
+              if (controller.showingArchive) {
+                controller.refresh();
+              } else {
+                performUiAction(context, () => controller.showArchived());
+              }
+            },
+      icon: Icon(
+        controller.showingArchive
+            ? Icons.inbox_outlined
+            : Icons.archive_outlined,
+      ),
     );
   }
 }

@@ -1,33 +1,39 @@
 import 'package:flutter/material.dart';
 
 import '../../../data/models/models.dart';
-import '../../../data/repositories/settings_repository.dart';
-import '../../constants/app_dimens.dart';
-import '../../constants/app_strings.dart';
-import '../../theme/app_theme.dart';
-import '../../theme/app_typography.dart';
-import '../paw_avatar_image.dart';
+
+import 'dart:async';
+
+import '../controller/chat_controller.dart';
+import '../../../core/widgets/async_action_builder.dart';
+import '../../../core/constants/app_dimens.dart';
+import '../../../core/constants/app_strings.dart';
+import '../../../core/theme/app_theme.dart';
+import '../../../core/theme/app_typography.dart';
+import '../../../core/widgets/paw_avatar_image.dart';
 
 class ChatModal extends StatefulWidget {
   final String ownerId;
   final String sitterId;
   final String sitterName;
   final String avatarPath;
+  final ChatController? controller;
 
   const ChatModal({
     super.key,
     required this.ownerId,
     required this.sitterId,
-    this.sitterName = AppStrings.defaultWalkerName,
-    this.avatarPath = AppStrings.defaultWalkerAvatar,
+    this.controller,
+    this.sitterName = AppStrings.chatTitle,
+    this.avatarPath = '',
   });
 
   static Future<void> show(
     BuildContext context, {
     required String ownerId,
     required String sitterId,
-    String sitterName = AppStrings.defaultWalkerName,
-    String avatarPath = AppStrings.defaultWalkerAvatar,
+    String sitterName = AppStrings.chatTitle,
+    String avatarPath = '',
   }) {
     final pawTheme = context.pawTheme;
     return showDialog<void>(
@@ -47,103 +53,55 @@ class ChatModal extends StatefulWidget {
 }
 
 class _ChatModalState extends State<ChatModal> {
-  final SettingsRepository _settingsRepository = const SettingsRepository();
   final TextEditingController _textController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
-  late UserRole _activeRole;
-  late List<ChatMessage> _messages;
+  late ChatController _controller;
+  void _start() {
+    _controller =
+        widget.controller ??
+        ChatController(ownerId: widget.ownerId, sitterId: widget.sitterId);
+    unawaited(_controller.load());
+  }
 
   @override
   void initState() {
     super.initState();
-    _activeRole = _settingsRepository.getUserRole();
-    _messages = _readMessages();
+    _start();
   }
-
-  bool get _canAccessConversation => _activeRole == UserRole.sitter
-      ? _settingsRepository.getActiveSitterId() == widget.sitterId
-      : _settingsRepository.getOwnerId() == widget.ownerId;
 
   @override
   void didUpdateWidget(covariant ChatModal oldWidget) {
     super.didUpdateWidget(oldWidget);
-    _activeRole = _settingsRepository.getUserRole();
-    _messages = _readMessages();
-    if (oldWidget.ownerId != widget.ownerId ||
-        oldWidget.sitterId != widget.sitterId ||
-        !_canAccessConversation) {
-      _textController.clear();
+    if (oldWidget.ownerId == widget.ownerId &&
+        oldWidget.sitterId == widget.sitterId &&
+        oldWidget.controller == widget.controller &&
+        _controller.canAccess) {
+      return;
     }
-  }
-
-  List<ChatMessage> _readMessages() {
-    if (!_canAccessConversation) return <ChatMessage>[];
-    return _settingsRepository
-        .getChatMessages(ownerId: widget.ownerId, sitterId: widget.sitterId)
-        .map((message) {
-          final senderRole =
-              message.senderRole ??
-              (message.isMe ? UserRole.owner : UserRole.sitter);
-          return message.copyWith(isMe: senderRole == _activeRole);
-        })
-        .toList();
+    if (oldWidget.controller == null) _controller.dispose();
+    _textController.clear();
+    _start();
   }
 
   @override
   void dispose() {
+    if (widget.controller == null) _controller.dispose();
     _textController.dispose();
     _scrollController.dispose();
     super.dispose();
   }
 
-  Future<void> _sendMessage() async {
-    _activeRole = _settingsRepository.getUserRole();
-    if (!_canAccessConversation) {
-      _textController.clear();
-      setState(() => _messages = <ChatMessage>[]);
-      return;
-    }
-    final text = _textController.text.trim();
-    if (text.isEmpty) return;
-
-    final ownerId = widget.ownerId;
-    final sitterId = widget.sitterId;
-    final now = DateTime.now();
-    final msg = ChatMessage(
-      id: 'msg_${now.microsecondsSinceEpoch}',
-      senderName: _activeRole == UserRole.sitter
-          ? _settingsRepository.getSitterName()
-          : _settingsRepository.getOwnerName(),
-      text: text,
-      time:
-          '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}',
-      isMe: _activeRole == UserRole.owner,
-      senderRole: _activeRole,
-    );
-
-    await _settingsRepository.addChatMessage(
-      msg,
-      ownerId: ownerId,
-      sitterId: sitterId,
-    );
-    if (!mounted || widget.ownerId != ownerId || widget.sitterId != sitterId) {
-      return;
-    }
-    _activeRole = _settingsRepository.getUserRole();
+  Future<bool> _sendMessage() => performUiAction(context, () async {
+    final controller = _controller;
+    await controller.send(_textController.text);
+    if (!mounted || !identical(controller, _controller)) return;
     _textController.clear();
-    setState(() {
-      _messages = _readMessages();
-    });
-
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || !_scrollController.hasClients) return;
-      _scrollController.animateTo(
-        _scrollController.position.maxScrollExtent,
-        duration: const Duration(milliseconds: 250),
-        curve: Curves.easeOut,
-      );
-    });
-  }
+    if (_scrollController.hasClients) _scrollController.jumpTo(0);
+  });
+  Future<bool> _older() => performUiAction(context, () async {
+    await _controller.loadOlder();
+    if (mounted && _scrollController.hasClients) _scrollController.jumpTo(0);
+  });
 
   BoxDecoration _dialogDecoration(
     ColorScheme colors,
@@ -175,13 +133,25 @@ class _ChatModalState extends State<ChatModal> {
           maxHeight: AppDimens.chatModalMaxHeight,
         ),
         decoration: _dialogDecoration(colors, pawTheme),
-        child: _ChatModalContent(
-          sitterName: widget.sitterName,
-          avatarPath: widget.avatarPath,
-          messages: _messages,
-          scrollController: _scrollController,
-          textController: _textController,
-          onSend: _canAccessConversation ? _sendMessage : null,
+        child: ValueListenableBuilder<ChatState>(
+          valueListenable: _controller,
+          builder: (context, state, _) => _ChatModalContent(
+            sitterName: widget.sitterName,
+            avatarPath: widget.avatarPath,
+            messages: _controller.canAccess ? state.messages : const [],
+            scrollController: _scrollController,
+            textController: _textController,
+            onSend: !_controller.isBusy && _controller.canAccess
+                ? _sendMessage
+                : null,
+            onOlder: !_controller.isBusy && state.before != null
+                ? _older
+                : null,
+            onLatest: !_controller.isBusy && (state.olderPage || state.failed)
+                ? () => unawaited(_controller.load())
+                : null,
+            loading: state.loading,
+          ),
         ),
       ),
     );
@@ -195,6 +165,9 @@ class _ChatModalContent extends StatelessWidget {
   final ScrollController scrollController;
   final TextEditingController textController;
   final VoidCallback? onSend;
+  final VoidCallback? onOlder;
+  final VoidCallback? onLatest;
+  final bool loading;
 
   const _ChatModalContent({
     required this.sitterName,
@@ -203,6 +176,9 @@ class _ChatModalContent extends StatelessWidget {
     required this.scrollController,
     required this.textController,
     required this.onSend,
+    this.onOlder,
+    this.onLatest,
+    this.loading = false,
   });
 
   @override
@@ -213,10 +189,17 @@ class _ChatModalContent extends StatelessWidget {
       children: <Widget>[
         _ChatHeader(sitterName: sitterName, avatarPath: avatarPath),
         Divider(height: AppDimens.dividerThin, color: colors.outlineVariant),
+        if (loading) const LinearProgressIndicator(),
+        if (onLatest != null)
+          TextButton(
+            onPressed: onLatest,
+            child: const Text(AppStrings.recentMessages),
+          ),
         Expanded(
           child: _ChatMessageList(
             messages: messages,
             scrollController: scrollController,
+            onOlder: onOlder,
           ),
         ),
         Divider(height: AppDimens.dividerThin, color: colors.outlineVariant),
@@ -243,7 +226,11 @@ class _ChatHeader extends StatelessWidget {
         children: <Widget>[
           CircleAvatar(
             radius: AppDimens.avatarRadiusMd,
-            backgroundImage: PawImageProvider.resolve(avatarPath),
+            backgroundImage: PawImageProvider.avatar(
+              context,
+              avatarPath,
+              radius: AppDimens.avatarRadiusMd,
+            ),
           ),
           const SizedBox(width: AppDimens.p12),
           Expanded(child: _ChatSitterOnlineStatus(sitterName: sitterName)),
@@ -303,19 +290,27 @@ class _ChatSitterOnlineStatus extends StatelessWidget {
 class _ChatMessageList extends StatelessWidget {
   final List<ChatMessage> messages;
   final ScrollController scrollController;
+  final VoidCallback? onOlder;
 
   const _ChatMessageList({
     required this.messages,
     required this.scrollController,
+    this.onOlder,
   });
 
   @override
   Widget build(BuildContext context) {
     return ListView.builder(
       controller: scrollController,
+      reverse: true,
       padding: const EdgeInsets.all(AppDimens.p18),
-      itemCount: messages.length,
-      itemBuilder: (context, index) => _ChatBubble(message: messages[index]),
+      itemCount: messages.length + (onOlder == null ? 0 : 1),
+      itemBuilder: (context, index) => index == messages.length
+          ? TextButton(
+              onPressed: onOlder,
+              child: const Text(AppStrings.olderMessages),
+            )
+          : _ChatBubble(message: messages[messages.length - 1 - index]),
     );
   }
 }

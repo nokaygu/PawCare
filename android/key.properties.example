@@ -1,0 +1,6 @@
+# Copy to android/key.properties locally; keep secrets out of version control.
+# storeFile is relative to the android directory, or an absolute path.
+storeFile=/absolute/path/to/release-keystore.jks
+storePassword=REPLACE_LOCALLY
+keyAlias=REPLACE_LOCALLY
+keyPassword=REPLACE_LOCALLY

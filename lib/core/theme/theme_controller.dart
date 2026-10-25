@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 
 import '../../data/repositories/settings_repository.dart';
+import '../utils/lifecycle_notifier.dart';
 
-class ThemeController extends ValueNotifier<ThemeMode> {
+class ThemeController extends LifecycleNotifier<ThemeMode> {
   final SettingsRepository _settingsRepository;
 
   ThemeController({SettingsRepository? settingsRepository})
@@ -16,11 +17,9 @@ class ThemeController extends ValueNotifier<ThemeMode> {
   bool get isDarkMode => value == ThemeMode.dark;
 
   Future<void> setDarkMode(bool isDark) async {
-    value = isDark ? ThemeMode.dark : ThemeMode.light;
-    await _settingsRepository.setIsDarkMode(isDark);
-  }
-
-  Future<void> toggleTheme() async {
-    await setDarkMode(!isDarkMode);
+    await runExclusive(() async {
+      await _settingsRepository.setIsDarkMode(isDark);
+      value = isDark ? ThemeMode.dark : ThemeMode.light;
+    });
   }
 }

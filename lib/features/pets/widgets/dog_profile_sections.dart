@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/constants/app_dimens.dart';
+import '../../../core/widgets/paw_paged_list.dart';
 import '../../../core/constants/app_strings.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/widgets/modals/call_modal.dart';
 import '../../../core/widgets/paw_avatar_image.dart';
+import '../../../core/widgets/paw_vaccine_status_badge.dart';
+import '../../../core/widgets/async_action_builder.dart';
 import '../../../data/models/models.dart';
 import '../controller/pets_controller.dart';
 import 'health_card_modal.dart';
@@ -392,17 +395,18 @@ class VaccineScheduleSection extends StatelessWidget {
       children: <Widget>[
         _buildHeaderRow(context),
         const SizedBox(height: AppDimens.p10),
-        ListView.separated(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
+        PawPagedList(
+          storageId: 'vaccines_${dog.id}',
           itemCount: dog.vaccinations.length,
           separatorBuilder: (_, _) => const SizedBox(height: AppDimens.p10),
           itemBuilder: (context, index) {
             final vac = dog.vaccinations[index];
             return _VaccineItemRow(
               vaccination: vac,
-              onToggleStatus: () =>
-                  petsController.toggleVaccinationStatus(vac.id),
+              onToggleStatus: () => performUiAction(
+                context,
+                () => petsController.toggleVaccinationStatus(vac.id),
+              ),
             );
           },
         ),
@@ -463,37 +467,8 @@ class _VaccineItemRow extends StatelessWidget {
                 ],
               ),
             ),
-            _VaccineStatusPill(isDone: isDone),
+            PawVaccineStatusBadge(status: vaccination.statusAt(DateTime.now())),
           ],
-        ),
-      ),
-    );
-  }
-}
-
-class _VaccineStatusPill extends StatelessWidget {
-  final bool isDone;
-
-  const _VaccineStatusPill({required this.isDone});
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.colors;
-    final pawTheme = context.pawTheme;
-    final textTheme = context.pawTextTheme;
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppDimens.p10,
-        vertical: AppDimens.p4,
-      ),
-      decoration: BoxDecoration(
-        color: isDone ? pawTheme.successContainer : colors.secondaryContainer,
-        borderRadius: BorderRadius.circular(AppDimens.radiusMd),
-      ),
-      child: Text(
-        isDone ? AppStrings.statusCompleted : AppStrings.statusUpcoming,
-        style: textTheme.labelSmall?.copyWith(
-          color: isDone ? pawTheme.success : colors.primary,
         ),
       ),
     );
@@ -502,8 +477,13 @@ class _VaccineStatusPill extends StatelessWidget {
 
 class NutritionAndBehaviorSection extends StatelessWidget {
   final String behaviorNote;
+  final String nutritionPlan;
 
-  const NutritionAndBehaviorSection({super.key, required this.behaviorNote});
+  const NutritionAndBehaviorSection({
+    super.key,
+    required this.behaviorNote,
+    this.nutritionPlan = '',
+  });
 
   BoxDecoration _boxDecoration(ColorScheme colors, PawThemeExtension pawTheme) {
     return BoxDecoration(
@@ -531,10 +511,12 @@ class NutritionAndBehaviorSection extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
-              const _NutritionBlockItem(
+              _NutritionBlockItem(
                 icon: Icons.restaurant,
                 title: AppStrings.dailyNutritionPlanTitle,
-                body: AppStrings.dailyNutritionPlanBody,
+                body: nutritionPlan.isEmpty
+                    ? AppStrings.noNutritionPlan
+                    : nutritionPlan,
               ),
               Divider(
                 height: AppDimens.dividerSpace,
@@ -628,7 +610,6 @@ class _VetClinicInnerRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
-    final textTheme = context.pawTextTheme;
     return Row(
       children: <Widget>[
         Container(
@@ -644,21 +625,30 @@ class _VetClinicInnerRow extends StatelessWidget {
           ),
         ),
         const SizedBox(width: AppDimens.p14),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              Text(dog.clinicName, style: textTheme.titleMedium),
-              const SizedBox(height: AppDimens.p2),
-              Text(AppStrings.chiefVetSubtitle, style: textTheme.bodySmall),
-              Text(
-                dog.clinicPhone,
-                style: AppTypography.toSemiBold(textTheme.bodySmall!),
-              ),
-            ],
-          ),
-        ),
+        Expanded(child: _buildClinicDetails(context)),
         _CallClinicButton(dog: dog),
+      ],
+    );
+  }
+
+  Widget _buildClinicDetails(BuildContext context) {
+    final textTheme = context.pawTextTheme;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        Text(dog.clinicName, style: textTheme.titleMedium),
+        const SizedBox(height: AppDimens.p2),
+        Text(
+          dog.veterinarianName.isEmpty
+              ? AppStrings.notProvided
+              : dog.veterinarianName,
+          style: textTheme.bodySmall,
+        ),
+        Text(
+          dog.clinicPhone,
+          style: AppTypography.toSemiBold(textTheme.bodySmall!),
+        ),
       ],
     );
   }
@@ -673,12 +663,14 @@ class _CallClinicButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.colors;
     return ElevatedButton.icon(
-      onPressed: () => CallModal.show(
-        context,
-        contactName: AppStrings.vetCallContactName(dog.clinicName),
-        roleSubtitle: AppStrings.vetEmergencySubtitle,
-        phoneNumber: dog.clinicPhone,
-      ),
+      onPressed: dog.clinicPhone.trim().isEmpty
+          ? null
+          : () => CallModal.show(
+              context,
+              contactName: AppStrings.vetCallContactName(dog.clinicName),
+              roleSubtitle: AppStrings.vetEmergencySubtitle,
+              phoneNumber: dog.clinicPhone,
+            ),
       icon: const Icon(Icons.phone, size: AppDimens.iconXs),
       label: const Text(AppStrings.callNowButton),
       style: ElevatedButton.styleFrom(

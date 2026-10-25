@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../constants/app_dimens.dart';
+import 'unread_notifications_scope.dart';
 import '../constants/app_strings.dart';
 import '../theme/app_theme.dart';
 import '../theme/app_typography.dart';
@@ -17,6 +18,16 @@ class PawHeaderActions extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final count = UnreadNotificationsScope.maybeOf(context);
+    if (count != null) {
+      return ValueListenableBuilder<int>(
+        valueListenable: count,
+        builder: (_, value, _) => _NotificationIconButton(
+          unreadCount: value,
+          onTap: onNotificationsTap,
+        ),
+      );
+    }
     return _NotificationIconButton(
       unreadCount: unreadCount,
       onTap: onNotificationsTap,

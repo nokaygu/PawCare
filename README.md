@@ -1,24 +1,24 @@
 # PawCare — Evcil Hayvan Bakım, Konaklama ve Sağlık Ekosistemi
 
-**PawCare**, köpek sahiplerini güvenilir köpek otelleri, ev ortamında bakım verenler, gezdiriciler, kreşler ve veterinerlerle buluşturan; aynı zamanda çoklu köpek profillerini, dijital mikroçip kimliğini, sağlık ve aşı karnelerini ve rezervasyon süreçlerini tek bir çatı altında yöneten çevrimdışı öncelikli (*Offline-First*) bir Flutter mobil uygulamasıdır.
+**PawCare**, köpek sahiplerini güvenilir köpek otelleri, ev ortamında bakım verenler, gezdiriciler, kreşler ve veterinerlerle buluşturan; aynı zamanda çoklu köpek profillerini, dijital mikroçip kimliğini, sağlık ve aşı karnelerini ve rezervasyon süreçlerini tek bir çatı altında yöneten çevrimdışı öncelikli (*Offline-First*) bir Flutter yerel demo uygulamasıdır.
 
 ---
 
 ## Temel Özellikler
 
 - **Tam Senkronize Çift Rol Deneyimi (Köpek Sahibi & Hizmet Veren / Bakıcı):**
-  - **Köpek Sahibi Modu (`Aygen Y.`):** Çoklu köpek hızlı geçişli özet paneli, sağlık kartı ve doğrudan profil düzenleme modalları, gelişmiş hizmet keşfi (dinamik sonuç başlığı, kategori, arama, maksimum bütçe ve fiyat sıralaması), tarih aralığı ve köpek seçimiyle rezervasyon talebi oluşturma, bekleyen talepleri iptal etme veya bakıcıyla mesajlaşma.
-  - **Hizmet Veren Modu (`Ayşe Yılmaz — Mutlu Patiler Köpek Oteli`):** Gelen rezervasyon taleplerini (köpeğin gerçek fotoğrafı ve sahip adıyla) onaylama/reddetme, onaylanan rezervasyonlara göre dinamik aylık kazanç ve aktif konuk takibi, ilan başlığı/fiyatı/açıklaması düzenleme, müsaitlik takvimi yönetimi ve müşteri değerlendirmeleri.
-  - **Rol Bazlı Dinamik Profil:** Aktif rol değiştirildiğinde Profil ekranındaki kullanıcı adı, e-posta, avatar (`assets/images/ayse.jpg` / sahip rozeti) ve alt özet bilgileri anında ilgili role uyum sağlar.
+  - **Köpek Sahibi Modu:** Çoklu köpek hızlı geçişli özet paneli, sağlık kartı ve doğrudan profil düzenleme modalları, gelişmiş hizmet keşfi (dinamik sonuç başlığı, kategori, arama, maksimum bütçe ve fiyat sıralaması), tarih aralığı ve köpek seçimiyle rezervasyon talebi oluşturma, bekleyen talepleri iptal etme veya bakıcıyla mesajlaşma.
+  - **Hizmet Veren Modu:** Gelen rezervasyon taleplerini (köpeğin gerçek fotoğrafı ve sahip adıyla) onaylama/reddetme, bu ay başlayan onaylı rezervasyonların brüt toplamı, konuk takibi ve hizmet tamamlama, ilan başlığı/fiyatı/açıklaması düzenleme, kapasite/müsaitlik takvimi yönetimi ve açıkça örnek olarak etiketlenen değerlendirmeler.
+  - **Rol Bazlı Dinamik Profil:** Aktif rol değiştirildiğinde Profil ekranındaki kullanıcı adı, e-posta, ilgili ilanın avatarı veya genel kişi rozeti ve alt özet bilgileri anında ilgili role uyum sağlar.
 - **Merkezi Metin ve Çoklu Dil Altyapısı (`AppStrings`):**
   - Tüm ekranlar ve ortak bileşenlerdeki statik/parametreli kullanıcı arayüzü metinleri `lib/core/constants/app_strings.dart` (`AppStrings`) altında toplanmıştır; widget'ların içinde doğrudan gömülü metin sabiti (`hardcoded string`) bulunmaz ve uygulama çoklu dil (`i18n` / `l10n`) geçişine hazırdır.
 - **Çoklu Köpek Yönetimi, Sağlık Kartı ve Dijital Kimlik:**
   - **Profili Düzenle & Yeni Köpek Ekle (`dog_form_modals.dart`):** Hem Ana Sayfa hem Köpeklerim sekmesinden mevcut köpeğin tüm bilgilerini düzenleme veya yeni köpek ekleyip köpekler arasında (`DogSelectorChipsRow`) tek dokunuşla geçiş yapma.
-  - **Dinamik Aşı Karnesi & Mikroçip Kimliği:** Yeni aşı ekleme, mevcut aşıların durumunu (`Tamamlandı` / `Yaklaşıyor`) tek dokunuşla güncelleme, yaklaşan aşı uyarılarını otomatik görüntüleme ve QR Dijital Kimlik (`MicrochipIdentityModal`) kartı.
+  - **Dinamik Aşı Karnesi & Mikroçip Kimliği:** Yeni aşı ekleme, mevcut aşıların durumunu (`Tamamlandı` / `Yaklaşıyor` / `Gecikti`) tek dokunuşla güncelleme, yaklaşan aşı uyarılarını otomatik görüntüleme ve Metin Mikroçip Kimliği (`MicrochipIdentityModal`) kartı.
 - **Saf Hive Yerel Veri Katmanı (Sıfır JSON & Sıfır Harici Backend):**
-  - Başlangıç verileri (`lib/data/local/hive_seed_data.dart`) doğrudan saf Dart nesneleri olarak `Hive` kutularına (`dogs_box`, `sitters_box`, `bookings_box`, `notifications_box`, `settings_box`) tohumlanır ve tüm CRUD işlemleri anında kalıcı hale getirilir.
+  - Başlangıç verileri (`lib/data/local/hive_seed_data.dart`) doğrudan saf Dart nesneleri olarak `Hive` kutularına (`dogs_box`, `sitters_box`, `bookings_box`, `notifications_box`, `settings_box`) yalnız ilk demo kurulumunda tohumlanır. Ayrı konuşma metadatası, mesaj, arşiv ve karantina kutuları kullanılır; mesaj/arşiv/karantina gövdeleri LazyBox içinde tutulur.
 - **Kalıcı Yerel Fotoğraf Yönetimi:**
-  - `image_picker` ve `path_provider` ile galeriden veya kameradan seçilen köpek fotoğrafları uygulama belgeler dizinine kopyalanır ve yolu Hive üzerinde saklanır.
+  - `image_picker` ve `path_provider` ile galeriden seçilen köpek fotoğrafları uygulama belgeler dizinine en fazla 1.600 piksel kenarla kaydedilir. Küçük görseller hedef boyutta çözülür; bekleyen galeri seçiminin hesap/köpek hedefi süreç yeniden açılışında korunur.
 - **Merkezi Tasarım Sistemi ("Warm Companion" & Koyu Yeşil / Haki Tema):**
   - Tüm renkler (`AppColors`), tipografi (`AppTypography`), tema uzantıları (`PawThemeExtension`), boyut/boşluk sabitleri (`AppDimens`) ve metinler (`AppStrings`) merkezi olarak yönetilir.
   - Açık Tema (*Warm Alabaster & Forest Green*) ve Koyu Yeşil / Haki Tema (*Deep Khaki `#16241A` & Warm Cream*) arasında anlık ve kalıcı geçiş yapılabilir.
@@ -35,6 +35,7 @@ lib/
 ├── main.dart
 ├── app/
 │   ├── app.dart
+│   ├── bootstrap.dart
 │   └── router/
 │       ├── app_router.dart
 │       └── app_shell.dart
@@ -57,7 +58,6 @@ lib/
 │       ├── paw_status_badge.dart
 │       └── modals/
 │           ├── call_modal.dart
-│           ├── chat_modal.dart
 │           └── live_tracking_modal.dart
 ├── data/
 │   ├── local/
@@ -69,6 +69,9 @@ lib/
 │       ├── booking_repository.dart
 │       ├── dog_repository.dart
 │       ├── notification_repository.dart
+│       ├── conversation_repository.dart
+│       ├── pet_photo_recovery.dart
+│       ├── sitter_account_repository.dart
 │       ├── settings_repository.dart
 │       └── sitter_repository.dart
 └── features/
@@ -85,6 +88,7 @@ lib/
     │       ├── dog_profile_sections.dart
     │       └── health_card_modal.dart
     ├── bookings/
+    ├── chat/                    # ChatController ve ChatModal
     ├── provider/
     ├── notifications/
     └── profile/
@@ -110,10 +114,39 @@ flutter run
 
 ## Kesinti Sonrası Teknik Onarım — 25 Ekim 2026
 
-Merkezi Dart dosyalarındaki kaçışlı satır sonları onarıldı. Rezervasyon callback senkronizasyonu, bakıcı bazlı sohbet geçmişi, rol duyarlı gönderici bilgisi, dolu günleri kapsayan tarih aralıkları, sayısal kayıt sıralaması ve dinamik ücret birimleri düzeltildi. Controller verileri ve temalar önbelleğe alınır; görseller asenkron okunur, değiştirilen uygulama fotoğrafları diskten ve görsel önbelleğinden temizlenir.
+Merkezi Dart dosyalarındaki kaçışlı satır sonları onarıldı. Rezervasyon callback senkronizasyonu, sahip–bakıcı çiftine göre ayrılmış sohbet geçmişi, rol duyarlı gönderici bilgisi, dolu günleri kapsayan tarih aralıkları, sayısal kayıt sıralaması ve dinamik ücret birimleri düzeltildi. Controller verileri ve temalar önbelleğe alınır; görseller asenkron okunur, değiştirilen uygulama fotoğrafları diskten ve görsel önbelleğinden temizlenir.
 
 Keşfet filtre sıfırlama kartı, tüm onaylı konukların listesi, rezervasyon tarih satırı ve aktif kayıt yokken hizmet keşfetme kartı eklendi. Gereksiz nabız animasyonu ve klavye modallarındaki tam ekran blur kaldırıldı. Yeni regresyon testleri sohbet yaşam döngüsü, takvim, Hive kalıcılığı, fotoğraf temizliği, controller önbelleği ve ekran senkronizasyonunu kapsar.
 
 21 maddelik denetim: [`eksiklikler.md`](eksiklikler.md). Son doğrulama sonuçları ve ilerleme: [`yapilanlar.md`](yapilanlar.md).
 
-**Son yeniden denetim:** 19 madde doğrulandı; 3.2 (profil adının ilanlara yansıması) ve 3.3 (bakıcı tarafında farklı sahiplerin sohbet ayrımı) kısmi olduğu için yeniden açıldı. `flutter analyze --no-pub` temiz, mevcut 40 test başarılı, Dart biçimlendirme kontrolü temiz; mevcut testler bu iki açığı kapsamıyor. Ayrıntılar `eksiklikler.md` bölüm 7 içinde.
+**Önceki denetim sonucu:** 21/21 madde tamamlandı. Profil adı Home/Keşfet/panelde eşitlenir; sohbetler kararlı sahip–bakıcı çiftiyle ayrılır ve hesap değişiminde ilgili kayıtlar yenilenir. `flutter analyze --no-pub` temiz, `flutter test --no-pub` **61 test başarılı**, Dart biçimlendirmesi temiz. Eski belirsiz sohbet kayıtları silinmeden arşivlenir. Bu sonuç önceki 21 maddelik denetimin kapsamıdır; yeni liste ve ilerleme `eksiklikler.md` ile `yapilanlar.md` içindedir.
+
+## Yeni denetim uygulaması — 25 Ekim 2026
+
+50 maddelik yeni denetimde **47 tamamlandı, 3 açık**; **171 test başarılı**, analiz temiz. İlk adımda hesap bazlı köpek/aktif seçim ve bildirim ayrımı, ayrı bakıcı kimliği/ilan taslağı ve doğru role yeniden giriş uygulandı. Bilinçli boş veri tekrar tohumlanmaz; bildirim zamanı gerçek olay tarihinden üretilir. Yeni sahip köpek ekleme kartıyla başlar. Sunuculu kimlik doğrulama veya ödeme entegrasyonu eklenmedi. Güncel görev ve kabul ölçütleri [eksiklikler.md](eksiklikler.md), kanıtlar [yapilanlar.md](yapilanlar.md) içindedir.
+
+
+<!-- audit-progress:start -->
+
+**Yeni denetim güncel durumu: 47/50 tamamlandı, 3 kabul bekliyor. 171 VM testi başarılı; 3 Chrome senaryosu doğrulandı; Flutter analizi temiz.**
+
+Android süreç kaybı kabulü tamamlandı; API 35 native profile ile liste, fotoğraf belleği ve depolama ölçüldü. Yalnız iOS cihazı (F01), macOS sandbox (F03) ve gerçek yayın sertifikası (F04) kabulü açık.
+
+Chrome açılışında Android kurtarması ve yerel fotoğraf dosyası taraması atlanır; IndexedDB kayıtları korunur.
+
+Ayrıntılı görev/kabul durumu: [eksiklikler.md](eksiklikler.md).
+
+<!-- audit-progress:end -->
+
+
+## Cihaz ve yayın doğrulaması
+
+Android debug APK: `build/app/outputs/flutter-apk/app-debug.apk`. Gerçek yayın için `android/key.properties.example` örneğini kullanarak depoya alınmayan `android/key.properties` dosyasını veya `PAWCARE_RELEASE_STORE_FILE`, `PAWCARE_RELEASE_STORE_PASSWORD`, `PAWCARE_RELEASE_KEY_ALIAS`, `PAWCARE_RELEASE_KEY_PASSWORD` ortam değişkenlerini yapılandırın. `storeFile`, Android dizinine göre veya mutlak dosya yoludur. Anahtar/şifre yokken release açık hatayla durur; debug anahtarıyla yayın paketi üretilmez.
+
+iOS galeri açıklaması ve macOS seçilmiş dosya okuma entitlementları eklendi. Apple cihazı/sandbox, Android süreç öldürme, cihaz performans profili ve gerçek sertifikayla yayın paketi kabulleri [eksiklikler.md](eksiklikler.md) içinde açık tutulur. Android emülatör denemelerinde renderer ve ADB yetkilendirme engelleri oluştu; bu girişimler başarılı native test olarak sayılmadı.
+
+
+## Chrome başlangıcı
+
+`flutter clean` ve `flutter pub get --offline` çalıştırıldı; paket sürümleri değiştirilmedi. Temizlik build/araç çıktılarını yeniler, tarayıcıdaki Hive IndexedDB kayıtlarını silmez. Chrome açılışında webde desteklenmeyen `Platform.isAndroid` çağrısı ve native fotoğraf dizini bakımı engellendi. Mevcut kayıtları sıfırlamadan tekrar `flutter run -d chrome` çalıştırılabilir.

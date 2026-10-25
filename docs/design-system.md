@@ -84,7 +84,7 @@ Ana yazı tipi **Nunito Sans**'tır. Hiçbir ekranda doğrudan `FontWeight` veya
   - *Hizmet Veren:* 1. Panel, 2. İlanım, 3. Takvim, 4. Değerlendirmeler, 5. Profil.
 - **6 Ana Ekran ve Etkileşimli Modallar:**
   - Ana Ekranlar: Karşılama, Keşfet, Sahip Ana Sayfası, Hizmet Detay & Rezervasyon, Çoklu Köpek Profili & Sağlık Kartı, Hizmet Veren Paneli ve Profil.
-  - Modallar: Giriş (`LoginModal`), Kayıt (`SignupModal`), Sağlık Kartı (`HealthCardModal`), Köpek Profili Düzenleme (`EditDogProfileModal`), Yeni Köpek Ekleme (`AddDogModal`), Dijital Mikroçip Kimliği (`MicrochipIdentityModal`), Keşfet Filtreleme (`_ExploreFilterModal`), İlan Düzenleme (`_EditSitterListingModal`), Kullanıcı Profili Düzenleme (`EditUserProfileModal`), Profil Bilgi Modalları (`ProfileInfoModal`), Canlı Takip Demo Haritası (`LiveTrackingModal`), Sohbet (`ChatModal`) ve Arama Onayı (`CallModal`).
+  - Modallar: Giriş (`LoginModal`), Kayıt (`SignupModal`), Sağlık Kartı (`HealthCardModal`), Köpek Profili Düzenleme (`EditDogProfileModal`), Yeni Köpek Ekleme (`AddDogModal`), Dijital Mikroçip Kimliği (`MicrochipIdentityModal`), Keşfet Filtreleme (`DiscoveryFilterModal`), İlan Düzenleme (`_EditSitterListingModal`), Kullanıcı Profili Düzenleme (`EditUserProfileModal`), Profil Bilgi Modalları (`ProfileInfoModal`), Yürüyüş Takip Demosu (`LiveTrackingModal`), Sohbet (`ChatModal`) ve Arama Onayı (`CallModal`).
 
 
 ## 6. Boş Durumlar ve Güncel Etkileşim Kuralları — 25 Ekim 2026
@@ -98,3 +98,25 @@ Ana yazı tipi **Nunito Sans**'tır. Hiçbir ekranda doğrudan `FontWeight` veya
 - Klavye kullanılan sohbet, giriş ve kayıt modalları yarı saydam modal bariyerini kullanır; tam ekran bulanıklık hesaplanmaz.
 
 Bu eklemeler mevcut tema, tipografi, ölçü ve merkezi metin kurallarıyla uygulanır. Denetim ve test sonuçları [`yapilanlar.md`](../yapilanlar.md) içindedir.
+
+
+## 7. Profil ve Sohbet Tutarlılığı
+
+Bakıcı profil adı kaydedildiğinde Home/Keşfet/panelde ilgili ilan adı güncellenir. Sohbet başlığındaki ad yalnız sunum içindir; konuşma sahip–bakıcı kimlik çiftiyle açılır. Hesap değişiminde başka kişiye ait geçmiş gösterilmez ve eski taslak temizlenir. Başka yerel hesaba atanmış e-posta profil düzenlemesinde kullanılırsa merkezi hata metni gösterilir ve form açık kalır. Bu akışlar mevcut görsel sistemi korur; 61 testlik doğrulama kapsamına dahildir.
+
+## 8. Hesaba ait boş durumlar — Yeni denetim Adım 1
+
+Yeni sahipte ana sayfa, Köpeklerim ve rezervasyon pet seçicisi `EmptyPetsCard` ile ilk köpek ekleme aksiyonu sunar; başka hesabın görsel/sağlık bilgisi örnek olarak yerleştirilmez. Pet yokken rezervasyon gönderimi kapalıdır. Ana sayfa karşılama metni koşulsuz sağlık garantisi vermeyen tarafsız bakım özeti kullanır. Bildirimler doğru alıcı/rol için gösterilir; zaman etiketi saklanmış tarihten üretilir, tarihi bilinmeyen demo kayıt açıkça etiketlenir. Mevcut renk/ölçü/tema sistemi korunur. Yeni kapsam: 6/50 madde, 71 başarılı test.
+
+
+<!-- audit-progress:start -->
+
+**Yeni denetim güncel durumu: 47/50 tamamlandı, 3 kabul bekliyor. 171 VM testi başarılı; 3 Chrome senaryosu doğrulandı; Flutter analizi temiz.**
+
+Tasarım değiştirilmeden tembel listeler ve sınırlı decode doğrulandı. 1.000 kayıtta ilk bağlı kart sayısı Keşfet 2 / Taleplerim 5; native profile frame ve fotoğraf cache ölçümleri Adım 11 içindedir.
+
+Chrome açılış düzeltmesinde tasarım değişmedi; gerçek WelcomeScreen ve OwnerHomeScreen görüntülenmesi doğrulandı.
+
+Ayrıntılı görev/kabul durumu: [eksiklikler.md](../eksiklikler.md).
+
+<!-- audit-progress:end -->

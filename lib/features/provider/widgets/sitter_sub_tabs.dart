@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/constants/app_dimens.dart';
+import 'missing_listing_card.dart';
 import '../../../core/constants/app_strings.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/widgets/paw_date_range_calendar.dart';
 import '../../../core/widgets/paw_header_actions.dart';
+import '../../../core/widgets/async_action_builder.dart';
 import '../../../data/models/models.dart';
 import '../controller/provider_controller.dart';
 
@@ -30,30 +32,40 @@ class SitterListingTab extends StatelessWidget {
         child: ValueListenableBuilder<ProviderState>(
           valueListenable: controller,
           builder: (context, state, _) {
-            return SingleChildScrollView(
-              padding: const EdgeInsets.all(AppDimens.paddingLg),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  _SubTabTopBar(
-                    title: AppStrings.myListingAndPricesTitle,
-                    unreadNotifications: unreadNotifications,
-                    onNotificationsTap: onNotificationsTap,
-                  ),
-                  const SizedBox(height: AppDimens.p16),
-                  _SitterListingDetailCard(
-                    sitter: state.primarySitter,
-                    onEditTap: () => _EditSitterListingModal.show(
-                      context,
-                      sitter: state.primarySitter,
-                      controller: controller,
-                    ),
-                  ),
-                ],
-              ),
-            );
+            if (!state.hasListing) {
+              return MissingListingCard(
+                onAccounts: controller.router.showWelcome,
+              );
+            }
+            return _buildListingContent(context, state);
           },
         ),
+      ),
+    );
+  }
+
+  Widget _buildListingContent(BuildContext context, ProviderState state) {
+    return SingleChildScrollView(
+      key: const PageStorageKey('provider_subtab_scroll'),
+      padding: const EdgeInsets.all(AppDimens.paddingLg),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          _SubTabTopBar(
+            title: AppStrings.myListingAndPricesTitle,
+            unreadNotifications: unreadNotifications,
+            onNotificationsTap: onNotificationsTap,
+          ),
+          const SizedBox(height: AppDimens.p16),
+          _SitterListingDetailCard(
+            sitter: state.primarySitter,
+            onEditTap: () => _EditSitterListingModal.show(
+              context,
+              sitter: state.primarySitter,
+              controller: controller,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -169,6 +181,7 @@ class _EditSitterListingModalState extends State<_EditSitterListingModal> {
   late final TextEditingController _locationCtrl;
   late final TextEditingController _priceCtrl;
   late final TextEditingController _bioCtrl;
+  late final TextEditingController _capacityCtrl;
 
   @override
   void initState() {
@@ -176,9 +189,12 @@ class _EditSitterListingModalState extends State<_EditSitterListingModal> {
     _titleCtrl = TextEditingController(text: widget.sitter.facilityTitle);
     _locationCtrl = TextEditingController(text: widget.sitter.location);
     _priceCtrl = TextEditingController(
-      text: widget.sitter.pricePerUnit.toInt().toString(),
+      text: Money.input(widget.sitter.pricePerUnit),
     );
     _bioCtrl = TextEditingController(text: widget.sitter.bio);
+    _capacityCtrl = TextEditingController(
+      text: widget.sitter.capacity.toString(),
+    );
   }
 
   @override
@@ -187,15 +203,20 @@ class _EditSitterListingModalState extends State<_EditSitterListingModal> {
     _locationCtrl.dispose();
     _priceCtrl.dispose();
     _bioCtrl.dispose();
+    _capacityCtrl.dispose();
     super.dispose();
   }
 
   Future<void> _save() async {
+    final price = Money.parse(_priceCtrl.text);
+    final capacity = int.tryParse(_capacityCtrl.text.trim());
+    if (price == null) throw ArgumentError(AppStrings.invalidPrice);
+    if (capacity == null) throw ArgumentError(AppStrings.invalidCapacity);
     await widget.controller.updateListingDetails(
       facilityTitle: _titleCtrl.text,
       location: _locationCtrl.text,
-      pricePerUnit:
-          double.tryParse(_priceCtrl.text.trim()) ?? widget.sitter.pricePerUnit,
+      pricePerUnit: price,
+      capacity: capacity,
       bio: _bioCtrl.text,
     );
     if (!mounted) return;
@@ -207,7 +228,6 @@ class _EditSitterListingModalState extends State<_EditSitterListingModal> {
 
   @override
   Widget build(BuildContext context) {
-    final colors = context.colors;
     final pawTheme = context.pawTheme;
     final textTheme = context.pawTextTheme;
 
@@ -221,11 +241,13 @@ class _EditSitterListingModalState extends State<_EditSitterListingModal> {
         style: textTheme.titleLarge,
       ),
       content: SingleChildScrollView(
+        key: const PageStorageKey('provider_subtab_scroll'),
         child: _EditListingFields(
           titleCtrl: _titleCtrl,
           locationCtrl: _locationCtrl,
           priceCtrl: _priceCtrl,
           bioCtrl: _bioCtrl,
+          capacityCtrl: _capacityCtrl,
           unitLabel: widget.sitter.unitLabel,
         ),
       ),
@@ -234,15 +256,24 @@ class _EditSitterListingModalState extends State<_EditSitterListingModal> {
           onPressed: () => Navigator.of(context).pop(),
           child: Text(AppStrings.cancel, style: textTheme.bodyLarge),
         ),
-        ElevatedButton(
-          onPressed: _save,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: colors.primary,
-            foregroundColor: colors.onPrimary,
-          ),
-          child: const Text(AppStrings.save),
-        ),
+        _buildSaveAction(context),
       ],
+    );
+  }
+
+  Widget _buildSaveAction(BuildContext context) {
+    final colors = context.colors;
+
+    return AsyncActionBuilder(
+      action: _save,
+      builder: (_, onSave, busy) => ElevatedButton(
+        onPressed: onSave,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: colors.primary,
+          foregroundColor: colors.onPrimary,
+        ),
+        child: Text(busy ? AppStrings.saving : AppStrings.save),
+      ),
     );
   }
 }
@@ -252,6 +283,7 @@ class _EditListingFields extends StatelessWidget {
   final TextEditingController locationCtrl;
   final TextEditingController priceCtrl;
   final TextEditingController bioCtrl;
+  final TextEditingController capacityCtrl;
   final String unitLabel;
 
   const _EditListingFields({
@@ -259,6 +291,7 @@ class _EditListingFields extends StatelessWidget {
     required this.locationCtrl,
     required this.priceCtrl,
     required this.bioCtrl,
+    required this.capacityCtrl,
     required this.unitLabel,
   });
 
@@ -283,20 +316,30 @@ class _EditListingFields extends StatelessWidget {
         const SizedBox(height: AppDimens.p10),
         TextField(
           controller: priceCtrl,
-          keyboardType: TextInputType.number,
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
           decoration: InputDecoration(
             labelText: AppStrings.fieldUnitPrice(unitLabel),
           ),
         ),
         const SizedBox(height: AppDimens.p10),
         TextField(
-          controller: bioCtrl,
-          maxLines: 3,
+          controller: capacityCtrl,
+          keyboardType: TextInputType.number,
           decoration: const InputDecoration(
-            labelText: AppStrings.fieldFacilityBio,
+            labelText: AppStrings.capacityLabel,
           ),
         ),
+        const SizedBox(height: AppDimens.p10),
+        _buildBioField(),
       ],
+    );
+  }
+
+  Widget _buildBioField() {
+    return TextField(
+      controller: bioCtrl,
+      maxLines: 3,
+      decoration: const InputDecoration(labelText: AppStrings.fieldFacilityBio),
     );
   }
 }
@@ -316,7 +359,6 @@ class SitterCalendarTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final pawTheme = context.pawTheme;
-    final textTheme = context.pawTextTheme;
 
     return Scaffold(
       backgroundColor: pawTheme.background,
@@ -324,31 +366,46 @@ class SitterCalendarTab extends StatelessWidget {
         child: ValueListenableBuilder<ProviderState>(
           valueListenable: controller,
           builder: (context, state, _) {
-            return SingleChildScrollView(
-              padding: const EdgeInsets.all(AppDimens.paddingLg),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  _SubTabTopBar(
-                    title: AppStrings.availabilityCalendarTitle,
-                    unreadNotifications: unreadNotifications,
-                    onNotificationsTap: onNotificationsTap,
-                  ),
-                  const SizedBox(height: AppDimens.p8),
-                  Text(
-                    AppStrings.availabilityCalendarHint,
-                    style: textTheme.bodyMedium,
-                  ),
-                  const SizedBox(height: AppDimens.p16),
-                  _CalendarContainerCard(
-                    unavailableDates: state.primarySitter.unavailableDates,
-                    onDayTapped: controller.toggleUnavailableDate,
-                  ),
-                ],
-              ),
-            );
+            if (!state.hasListing) {
+              return MissingListingCard(
+                onAccounts: controller.router.showWelcome,
+              );
+            }
+            return _buildCalendarContent(context, state);
           },
         ),
+      ),
+    );
+  }
+
+  Widget _buildCalendarContent(BuildContext context, ProviderState state) {
+    final textTheme = context.pawTextTheme;
+
+    return SingleChildScrollView(
+      key: const PageStorageKey('provider_subtab_scroll'),
+      padding: const EdgeInsets.all(AppDimens.paddingLg),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          _SubTabTopBar(
+            title: AppStrings.availabilityCalendarTitle,
+            unreadNotifications: unreadNotifications,
+            onNotificationsTap: onNotificationsTap,
+          ),
+          const SizedBox(height: AppDimens.p8),
+          Text(
+            AppStrings.availabilityCalendarHint,
+            style: textTheme.bodyMedium,
+          ),
+          const SizedBox(height: AppDimens.p16),
+          _CalendarContainerCard(
+            unavailableDates: state.primarySitter.unavailableDates,
+            onDayTapped: (date) => performUiAction(
+              context,
+              () => controller.toggleUnavailableDate(date),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -377,6 +434,7 @@ class _CalendarContainerCard extends StatelessWidget {
         ),
       ),
       child: PawDateRangeCalendar(
+        storageId: 'provider_calendar',
         initialMonth: DateTime.now(),
         unavailableDates: unavailableDates,
         onDayTapped: onDayTapped,
@@ -402,6 +460,7 @@ class SitterReviewsTab extends StatelessWidget {
       backgroundColor: pawTheme.background,
       body: SafeArea(
         child: SingleChildScrollView(
+          key: const PageStorageKey('provider_subtab_scroll'),
           padding: const EdgeInsets.all(AppDimens.paddingLg),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,

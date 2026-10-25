@@ -1,8 +1,13 @@
 final RegExp _recordSequence = RegExp(r'(\d+)$');
+final RegExp _timestampedId = RegExp(r'_(\d+)_[0-9a-f]{32}$');
 
 int compareNewestRecordIds(String first, String second) {
-  final firstDigits = _recordSequence.firstMatch(first)?.group(1);
-  final secondDigits = _recordSequence.firstMatch(second)?.group(1);
+  final firstDigits =
+      _timestampedId.firstMatch(first)?.group(1) ??
+      _recordSequence.firstMatch(first)?.group(1);
+  final secondDigits =
+      _timestampedId.firstMatch(second)?.group(1) ??
+      _recordSequence.firstMatch(second)?.group(1);
   final firstNumber = firstDigits == null ? null : BigInt.tryParse(firstDigits);
   final secondNumber = secondDigits == null
       ? null

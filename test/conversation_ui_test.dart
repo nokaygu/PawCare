@@ -1,7 +1,8 @@
+import 'package:paw_care/data/repositories/conversation_repository.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:paw_care/core/theme/app_theme.dart';
-import 'package:paw_care/core/widgets/modals/chat_modal.dart';
+import 'package:paw_care/features/chat/view/chat_modal.dart';
 import 'package:paw_care/data/local/hive_boxes.dart';
 import 'package:paw_care/data/models/models.dart';
 import 'package:paw_care/data/repositories/settings_repository.dart';
@@ -33,8 +34,11 @@ void main() {
     await _send(tester, 'B kişisinin mesajı');
 
     await settings.setUserRole(UserRole.sitter);
-    await settings.setActiveSitterId(sitterId);
-    await settings.setSitterName('Ortak Bakıcı');
+    await settings.activateSitter(
+      sitterId: sitterId,
+      name: 'Ortak Bakıcı',
+      email: 'shared_sitter@example.com',
+    );
     await _mountChat(tester, ownerA, sitterId);
     expect(find.text('A kişisinin mesajı'), findsOneWidget);
     expect(find.text('B kişisinin mesajı'), findsNothing);
@@ -54,15 +58,17 @@ void main() {
     expect(_alignment(tester, 'A kişisinin mesajı'), Alignment.centerRight);
     expect(_alignment(tester, 'A kişisine yanıt'), Alignment.centerLeft);
     expect(
-      settings
-          .getChatMessages(ownerId: ownerA, sitterId: sitterId)
-          .map((message) => message.senderName),
+      (await const ConversationRepository().readAll(
+        ownerId: ownerA,
+        sitterId: sitterId,
+      )).map((message) => message.senderName),
       <String>['Sahip A', 'Ortak Bakıcı'],
     );
     expect(
-      settings
-          .getChatMessages(ownerId: ownerB, sitterId: sitterId)
-          .map((message) => message.senderName),
+      (await const ConversationRepository().readAll(
+        ownerId: ownerB,
+        sitterId: sitterId,
+      )).map((message) => message.senderName),
       <String>['Sahip B', 'Ortak Bakıcı'],
     );
     expect(tester.takeException(), isNull);
@@ -92,17 +98,17 @@ void main() {
     expect(find.text('İlk bakıcıya mesaj'), findsOneWidget);
     expect(find.text('İkinci bakıcıya mesaj'), findsNothing);
     expect(
-      settings
-          .getChatMessages(ownerId: ownerId, sitterId: 'sitter_a')
-          .single
-          .text,
+      (await const ConversationRepository().readAll(
+        ownerId: ownerId,
+        sitterId: 'sitter_a',
+      )).single.text,
       'İlk bakıcıya mesaj',
     );
     expect(
-      settings
-          .getChatMessages(ownerId: ownerId, sitterId: 'sitter_b')
-          .single
-          .text,
+      (await const ConversationRepository().readAll(
+        ownerId: ownerId,
+        sitterId: 'sitter_b',
+      )).single.text,
       'İkinci bakıcıya mesaj',
     );
   });
@@ -111,6 +117,11 @@ void main() {
     tester,
   ) async {
     const sitterId = 'rename_sitter';
+    await settings.activateSitter(
+      sitterId: sitterId,
+      name: 'İlk Bakıcı Adı',
+      email: 'rename_sitter@example.com',
+    );
     final ownerId = await settings.activateOwner(
       email: 'before_rename@example.com',
       name: 'İlk Sahip Adı',
@@ -134,10 +145,10 @@ void main() {
     expect(find.text('Ad değiştikten sonra'), findsOneWidget);
     await _send(tester, 'Bakıcıdan yeni yanıt');
 
-    final messages = settings.getChatMessages(
+    final messages = (await const ConversationRepository().readAll(
       ownerId: ownerId,
       sitterId: sitterId,
-    );
+    ));
     expect(messages.map((message) => message.senderName), <String>[
       'İlk Sahip Adı',
       'Yeni Sahip Adı',
@@ -184,11 +195,17 @@ void main() {
       isNull,
     );
     expect(
-      settings.getChatMessages(ownerId: ownerA, sitterId: sitterId),
+      (await const ConversationRepository().readAll(
+        ownerId: ownerA,
+        sitterId: sitterId,
+      )),
       hasLength(1),
     );
     expect(
-      settings.getChatMessages(ownerId: ownerB, sitterId: sitterId),
+      (await const ConversationRepository().readAll(
+        ownerId: ownerB,
+        sitterId: sitterId,
+      )),
       isEmpty,
     );
   });
@@ -203,8 +220,11 @@ void main() {
       name: 'Köpek Sahibi',
     );
     await settings.setUserRole(UserRole.sitter);
-    await settings.setActiveSitterId(sitterA);
-    await settings.setSitterName('Bakıcı A');
+    await settings.activateSitter(
+      sitterId: sitterA,
+      name: 'Bakıcı A',
+      email: 'sitter_a@example.com',
+    );
     await _mountChat(tester, ownerId, sitterA);
     await _send(tester, 'A bakıcısının özel mesajı');
     await tester.enterText(
@@ -215,8 +235,11 @@ void main() {
         .widget<IconButton>(find.widgetWithIcon(IconButton, Icons.send_rounded))
         .onPressed!;
 
-    await settings.setActiveSitterId(sitterB);
-    await settings.setSitterName('Bakıcı B');
+    await settings.activateSitter(
+      sitterId: sitterB,
+      name: 'Bakıcı B',
+      email: 'sitter_b@example.com',
+    );
     oldSend();
     await tester.pumpAndSettle();
     expect(find.text('A bakıcısının özel mesajı'), findsNothing);
@@ -230,11 +253,17 @@ void main() {
       isNull,
     );
     expect(
-      settings.getChatMessages(ownerId: ownerId, sitterId: sitterA),
+      (await const ConversationRepository().readAll(
+        ownerId: ownerId,
+        sitterId: sitterA,
+      )),
       hasLength(1),
     );
     expect(
-      settings.getChatMessages(ownerId: ownerId, sitterId: sitterB),
+      (await const ConversationRepository().readAll(
+        ownerId: ownerId,
+        sitterId: sitterB,
+      )),
       isEmpty,
     );
   });

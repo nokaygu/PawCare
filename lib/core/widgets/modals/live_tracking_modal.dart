@@ -6,16 +6,26 @@ import '../../constants/app_dimens.dart';
 import '../../constants/app_strings.dart';
 import '../../theme/app_theme.dart';
 import '../../theme/app_typography.dart';
+import '../../../data/models/models.dart';
+import '../paw_avatar_image.dart';
 
 class LiveTrackingModal extends StatelessWidget {
-  const LiveTrackingModal({super.key});
+  final BookingRequest booking;
+  const LiveTrackingModal({super.key, required this.booking});
 
-  static Future<void> show(BuildContext context) {
+  static Future<void> show(
+    BuildContext context, {
+    required BookingRequest booking,
+  }) {
+    if (booking.serviceType != ServiceType.walk ||
+        !booking.isActiveAt(DateTime.now())) {
+      return Future<void>.value();
+    }
     final pawTheme = context.pawTheme;
     return showDialog<void>(
       context: context,
       barrierColor: pawTheme.modalBarrier,
-      builder: (_) => const LiveTrackingModal(),
+      builder: (_) => LiveTrackingModal(booking: booking),
     );
   }
 
@@ -51,9 +61,9 @@ class LiveTrackingModal extends StatelessWidget {
         child: Container(
           constraints: const BoxConstraints(maxWidth: AppDimens.maxShellWidth),
           decoration: _dialogDecoration(colors, pawTheme),
-          child: const SingleChildScrollView(
-            padding: EdgeInsets.all(AppDimens.paddingXl),
-            child: _LiveTrackingBody(),
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(AppDimens.paddingXl),
+            child: _LiveTrackingBody(booking: booking),
           ),
         ),
       ),
@@ -62,21 +72,22 @@ class LiveTrackingModal extends StatelessWidget {
 }
 
 class _LiveTrackingBody extends StatelessWidget {
-  const _LiveTrackingBody();
+  final BookingRequest booking;
+  const _LiveTrackingBody({required this.booking});
 
   @override
   Widget build(BuildContext context) {
-    return const Column(
+    return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
-        _LiveTrackingHeader(),
-        SizedBox(height: AppDimens.p16),
-        _StylizedDemoMap(),
-        SizedBox(height: AppDimens.p16),
-        _LiveStatsRow(),
-        SizedBox(height: AppDimens.p14),
-        _DemoInfoNote(),
+        const _LiveTrackingHeader(),
+        const SizedBox(height: AppDimens.p16),
+        _StylizedDemoMap(booking: booking),
+        const SizedBox(height: AppDimens.p16),
+        const _LiveStatsRow(),
+        const SizedBox(height: AppDimens.p14),
+        const _DemoInfoNote(),
       ],
     );
   }
@@ -125,7 +136,8 @@ class _LiveTrackingHeader extends StatelessWidget {
 }
 
 class _StylizedDemoMap extends StatelessWidget {
-  const _StylizedDemoMap();
+  final BookingRequest booking;
+  const _StylizedDemoMap({required this.booking});
 
   @override
   Widget build(BuildContext context) {
@@ -154,10 +166,10 @@ class _StylizedDemoMap extends StatelessWidget {
               ),
             ),
           ),
-          const Positioned(
+          Positioned(
             top: AppDimens.liveMapPinTop,
             left: AppDimens.liveMapPinLeft,
-            child: _WalkerPinAvatar(),
+            child: _WalkerPinAvatar(booking: booking),
           ),
         ],
       ),
@@ -233,28 +245,17 @@ class _MapParkBadge extends StatelessWidget {
 }
 
 class _WalkerPinAvatar extends StatelessWidget {
-  const _WalkerPinAvatar();
+  final BookingRequest booking;
+  const _WalkerPinAvatar({required this.booking});
 
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
-    final pawTheme = context.pawTheme;
     final textTheme = context.pawTextTheme;
 
     return Column(
       children: <Widget>[
-        Container(
-          padding: const EdgeInsets.all(AppDimens.p3),
-          decoration: BoxDecoration(
-            color: colors.primary,
-            shape: BoxShape.circle,
-            boxShadow: pawTheme.cardShadow,
-          ),
-          child: const CircleAvatar(
-            radius: AppDimens.avatarRadiusXs,
-            backgroundImage: AssetImage(AppStrings.defaultWalkerAvatar),
-          ),
-        ),
+        _buildAvatar(context),
         Container(
           margin: const EdgeInsets.only(top: AppDimens.p4),
           padding: const EdgeInsets.symmetric(
@@ -266,11 +267,33 @@ class _WalkerPinAvatar extends StatelessWidget {
             borderRadius: BorderRadius.circular(AppDimens.radiusSm),
           ),
           child: Text(
-            AppStrings.walkerPinBadge,
+            AppStrings.trackingPair(booking.sitterName, booking.petName),
             style: textTheme.labelSmall?.copyWith(color: colors.onPrimary),
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildAvatar(BuildContext context) {
+    final colors = context.colors;
+    final pawTheme = context.pawTheme;
+
+    return Container(
+      padding: const EdgeInsets.all(AppDimens.p3),
+      decoration: BoxDecoration(
+        color: colors.primary,
+        shape: BoxShape.circle,
+        boxShadow: pawTheme.cardShadow,
+      ),
+      child: CircleAvatar(
+        radius: AppDimens.avatarRadiusXs,
+        backgroundImage: PawImageProvider.avatar(
+          context,
+          booking.sitterPhoto,
+          radius: AppDimens.avatarRadiusXs,
+        ),
+      ),
     );
   }
 }

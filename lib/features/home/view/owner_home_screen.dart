@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/constants/app_dimens.dart';
+import '../../../core/widgets/async_action_builder.dart';
+import '../../../core/constants/app_strings.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../data/models/models.dart';
+import '../../../data/models/home_state.dart';
 import '../../pets/controller/pets_controller.dart';
 import '../../pets/widgets/dog_profile_sections.dart';
+import '../../pets/widgets/empty_pets_card.dart';
 import '../controller/home_controller.dart';
 import '../widgets/owner_home_sections.dart';
 
@@ -32,6 +36,7 @@ class OwnerHomeScreen extends StatelessWidget {
       backgroundColor: pawTheme.background,
       body: SafeArea(
         child: SingleChildScrollView(
+          key: const PageStorageKey('home_scroll'),
           padding: const EdgeInsets.symmetric(
             horizontal: AppDimens.paddingLg,
             vertical: AppDimens.paddingLg,
@@ -64,20 +69,21 @@ class _OwnerHomeBody extends StatelessWidget {
     required this.onNotificationsTap,
   });
 
-  Widget _buildHeaderListener() => ValueListenableBuilder<Dog>(
-    valueListenable: petsController,
-    builder: (_, dog, _) => OwnerHomeTopHeader(
-      ownerName: homeController.ownerFirstName,
-      dogName: dog.name,
+  Widget _buildHeaderListener() => ValueListenableBuilder<HomeState>(
+    valueListenable: homeController,
+    builder: (_, state, _) => OwnerHomeTopHeader(
+      ownerName: state.ownerFirstName,
+      dogName: state.selectedDog?.name ?? '',
       onSwitchRole: homeController.switchToSitterMode,
       unreadNotifications: unreadNotifications,
       onNotificationsTap: onNotificationsTap,
     ),
   );
 
-  Widget _buildDogListener() => ValueListenableBuilder<Dog>(
+  Widget _buildDogListener() => ValueListenableBuilder<Dog?>(
     valueListenable: petsController,
-    builder: (_, dog, _) {
+    builder: (context, dog, _) {
+      if (dog == null) return EmptyPetsCard(controller: petsController);
       final allDogs = petsController.allDogs;
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -86,7 +92,8 @@ class _OwnerHomeBody extends StatelessWidget {
             DogSelectorChipsRow(
               dogs: allDogs,
               selectedDogId: dog.id,
-              onSelectDog: petsController.selectDog,
+              onSelectDog: (id) =>
+                  performUiAction(context, () => petsController.selectDog(id)),
             ),
             const SizedBox(height: AppDimens.p12),
           ],
@@ -96,18 +103,38 @@ class _OwnerHomeBody extends StatelessWidget {
     },
   );
 
-  Widget _buildSittersListener() => ValueListenableBuilder<List<SitterListing>>(
+  Widget _buildSittersListener() => ValueListenableBuilder<HomeState>(
     valueListenable: homeController,
-    builder: (_, sitters, _) => Column(
+    builder: (_, state, _) => Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
         TodaysReservationLiveCard(
-          activeBooking: homeController.activeConfirmedBooking,
-          onExplore: homeController.openExploreTab,
+          activeBooking: state.activeBooking ?? state.nextBooking,
+          now: state.evaluatedAt,
+          onOpenBookings: homeController.openBookingsTab,
+          onExplore: state.pendingCount > 0
+              ? homeController.openBookingsTab
+              : homeController.openExploreTab,
+          emptyActionLabel: state.pendingCount > 0
+              ? AppStrings.viewRequests
+              : AppStrings.exploreSittersButton,
+          emptyBody: state.pendingCount > 0
+              ? AppStrings.pendingReservationSubtitle
+              : null,
         ),
+        if (state.pendingCount > 0)
+          TextButton(
+            onPressed: homeController.openBookingsTab,
+            child: Text(AppStrings.pendingReservations(state.pendingCount)),
+          ),
+        if (state.otherBookingCount > 0)
+          TextButton(
+            onPressed: homeController.openBookingsTab,
+            child: Text(AppStrings.otherReservations(state.otherBookingCount)),
+          ),
         const SizedBox(height: AppDimens.p24),
         FeaturedSittersSection(
-          sitters: sitters,
+          sitters: state.featuredSitters,
           onSeeAll: homeController.openExploreTab,
           onSitterTap: onSitterSelected,
         ),

@@ -1,8 +1,7 @@
-import 'dart:math';
-
 import '../../core/constants/app_strings.dart';
+import '../../core/utils/input_validation.dart';
+import '../../core/utils/record_id.dart';
 import '../local/hive_boxes.dart';
-import '../local/hive_seed_data.dart';
 import '../models/models.dart';
 
 class SettingsRepository {
@@ -10,136 +9,102 @@ class SettingsRepository {
 
   static const String _themeModeKey = 'is_dark_mode';
   static const String _roleKey = 'user_role';
-  static const String _chatMessagesKeyPrefix = 'chat_messages_';
   static const String _userNameKey = 'user_name';
   static const String _userEmailKey = 'user_email';
-  static const String _sitterNameKey = 'sitter_user_name';
-  static const String _sitterEmailKey = 'sitter_user_email';
   static const String _ownerIdKey = 'owner_id';
   static const String _ownerIdsByEmailKey = 'owner_ids_by_email';
   static const String _ownerProfilesKey = 'owner_profiles';
   static const String _activeSitterIdKey = 'active_sitter_id';
   static const String activeDogIdKey = 'active_dog_id';
 
-  bool getIsDarkMode() {
-    final val = HiveBoxes.getValue(
-      HiveBoxes.settingsBoxName,
-      _themeModeKey,
-      defaultValue: false,
-    );
-    return val as bool? ?? false;
-  }
+  bool getIsDarkMode() =>
+      HiveBoxes.getValue(HiveBoxes.settingsBoxName, _themeModeKey) as bool;
 
   Future<void> setIsDarkMode(bool isDark) async {
     await HiveBoxes.putValue(HiveBoxes.settingsBoxName, _themeModeKey, isDark);
   }
 
-  UserRole getUserRole() {
-    final roleName = HiveBoxes.getValue(
-      HiveBoxes.settingsBoxName,
-      _roleKey,
-      defaultValue: UserRole.owner.name,
-    ) as String?;
-    return UserRole.values.firstWhere(
-      (r) => r.name == roleName,
-      orElse: () => UserRole.owner,
-    );
-  }
+  UserRole getUserRole() => UserRole.values.byName(
+    HiveBoxes.getValue(HiveBoxes.settingsBoxName, _roleKey) as String,
+  );
+
+  bool get hasCompletedWelcome =>
+      HiveBoxes.getValue(HiveBoxes.settingsBoxName, 'welcome_completed') ==
+      true;
 
   Future<void> setUserRole(UserRole role) async {
-    await HiveBoxes.putValue(HiveBoxes.settingsBoxName, _roleKey, role.name);
+    await HiveBoxes.putValues(HiveBoxes.settingsBoxName, {
+      _roleKey: role.name,
+      'welcome_completed': true,
+    });
   }
 
-  String getUserName() {
-    return HiveBoxes.getValue(
-          HiveBoxes.settingsBoxName,
-          _userNameKey,
-          defaultValue: AppStrings.defaultOwnerFullName,
-        ) as String? ??
-        AppStrings.defaultOwnerFullName;
-  }
+  String getUserName() =>
+      HiveBoxes.getValue(HiveBoxes.settingsBoxName, _userNameKey) as String;
 
   String getOwnerName() => getUserName();
 
-  Future<void> setUserName(String name) async {
-    await HiveBoxes.putValue(HiveBoxes.settingsBoxName, _userNameKey, name);
-    await _storeOwnerProfile(getOwnerId(), name, getUserEmail());
-  }
+  Future<void> setUserName(String name) =>
+      updateOwnerProfile(ownerId: getOwnerId(), name: name);
 
-  String getUserEmail() {
-    return HiveBoxes.getValue(
-          HiveBoxes.settingsBoxName,
-          _userEmailKey,
-          defaultValue: AppStrings.defaultOwnerEmail,
-        ) as String? ??
-        AppStrings.defaultOwnerEmail;
-  }
+  String getUserEmail() =>
+      HiveBoxes.getValue(HiveBoxes.settingsBoxName, _userEmailKey) as String;
 
-  Future<void> setUserEmail(String email) async {
-    final normalizedEmail = email.trim().toLowerCase();
-    final identities = _ownerIdsByEmail();
-    final ownerId = getOwnerId();
-    final existingOwner = identities[normalizedEmail];
-    if (existingOwner != null && existingOwner != ownerId) {
+  Future<void> setUserEmail(String email) =>
+      updateOwnerProfile(ownerId: getOwnerId(), email: email);
+
+  void validateProfileEmail(String email, UserRole role, String identity) {
+    if (!InputValidation.isEmail(email)) {
+      throw ArgumentError(AppStrings.invalidEmail);
+    }
+    final normalized = email.trim().toLowerCase();
+    final own = role == UserRole.owner
+        ? _ownerIdsByEmail()
+        : sitterIdsByEmail();
+    final other = role == UserRole.owner
+        ? sitterIdsByEmail()
+        : _ownerIdsByEmail();
+    if ((own[normalized] != null && own[normalized] != identity) ||
+        other.containsKey(normalized)) {
       throw ArgumentError.value(email, 'email');
     }
-    final previousEmail = getUserEmail().trim().toLowerCase();
-    if (identities[previousEmail] == ownerId) {
-      identities.remove(previousEmail);
-    }
-    identities[normalizedEmail] = ownerId;
-    await HiveBoxes.putValue(
-      HiveBoxes.settingsBoxName,
-      _ownerIdsByEmailKey,
-      identities,
-    );
-    await HiveBoxes.putValue(HiveBoxes.settingsBoxName, _userEmailKey, email);
-    await _storeOwnerProfile(ownerId, getOwnerName(), email);
   }
 
-  String getOwnerId() {
-    return HiveBoxes.getValue(
-          HiveBoxes.settingsBoxName,
-          _ownerIdKey,
-          defaultValue: ConversationIdentity.legacyOwnerId,
-        ) as String? ??
-        ConversationIdentity.legacyOwnerId;
-  }
-
-  Map<String, dynamic> _ownerIdsByEmail() {
-    final raw = HiveBoxes.getValue(
-      HiveBoxes.settingsBoxName,
-      _ownerIdsByEmailKey,
-    );
-    return raw is Map
-        ? Map<String, dynamic>.from(raw)
-        : <String, dynamic>{
-            AppStrings.defaultOwnerEmail: ConversationIdentity.legacyOwnerId,
-            getUserEmail().trim().toLowerCase(): getOwnerId(),
-          };
-  }
-
-  Map<String, dynamic> _ownerProfiles() {
-    final raw = HiveBoxes.getValue(
-      HiveBoxes.settingsBoxName,
-      _ownerProfilesKey,
-    );
-    return raw is Map ? Map<String, dynamic>.from(raw) : <String, dynamic>{};
-  }
-
-  Future<void> _storeOwnerProfile(
-    String ownerId,
-    String name,
-    String email,
-  ) async {
+  Future<void> updateOwnerProfile({
+    required String ownerId,
+    String? name,
+    String? email,
+  }) async {
+    if (getOwnerId() != ownerId) throw StateError('Account changed');
+    final nextName = name ?? getOwnerName();
+    final nextEmail = email?.trim() ?? getUserEmail();
+    validateProfileEmail(nextEmail, UserRole.owner, ownerId);
+    final identities = _ownerIdsByEmail()
+      ..removeWhere((_, id) => id == ownerId);
+    identities[nextEmail.toLowerCase()] = ownerId;
     final profiles = _ownerProfiles();
-    profiles[ownerId] = <String, dynamic>{'name': name, 'email': email};
-    await HiveBoxes.putValue(
-      HiveBoxes.settingsBoxName,
-      _ownerProfilesKey,
-      profiles,
-    );
+    profiles[ownerId] = <String, dynamic>{'name': nextName, 'email': nextEmail};
+    await HiveBoxes.putValues(HiveBoxes.settingsBoxName, {
+      _ownerIdsByEmailKey: identities,
+      _ownerProfilesKey: profiles,
+      _userNameKey: nextName,
+      _userEmailKey: nextEmail,
+    });
   }
+
+  String getOwnerId() =>
+      HiveBoxes.getValue(HiveBoxes.settingsBoxName, _ownerIdKey) as String;
+
+  Map<String, dynamic> _ownerIdsByEmail() => Map<String, dynamic>.from(
+    HiveBoxes.getValue(HiveBoxes.settingsBoxName, _ownerIdsByEmailKey) as Map,
+  );
+
+  String? findOwnerIdByEmail(String email) =>
+      _ownerIdsByEmail()[email.trim().toLowerCase()] as String?;
+
+  Map<String, dynamic> _ownerProfiles() => Map<String, dynamic>.from(
+    HiveBoxes.getValue(HiveBoxes.settingsBoxName, _ownerProfilesKey) as Map,
+  );
 
   Future<String> activateOwner({required String email, String? name}) async {
     final normalizedEmail = email.trim().toLowerCase();
@@ -161,47 +126,21 @@ class SettingsRepository {
       'name': displayName,
       'email': email.trim(),
     };
-    await HiveBoxes.putValue(
-      HiveBoxes.settingsBoxName,
-      _ownerIdsByEmailKey,
-      identities,
-    );
-    await HiveBoxes.putValue(
-      HiveBoxes.settingsBoxName,
-      _ownerProfilesKey,
-      profiles,
-    );
-    await HiveBoxes.putValue(HiveBoxes.settingsBoxName, _ownerIdKey, ownerId);
-    await HiveBoxes.putValue(
-      HiveBoxes.settingsBoxName,
-      _userNameKey,
-      displayName,
-    );
-    await HiveBoxes.putValue(
-      HiveBoxes.settingsBoxName,
-      _userEmailKey,
-      email.trim(),
-    );
+    await HiveBoxes.putValues(HiveBoxes.settingsBoxName, {
+      _ownerIdsByEmailKey: identities,
+      _ownerProfilesKey: profiles,
+      _ownerIdKey: ownerId,
+      _userNameKey: displayName,
+      _userEmailKey: email.trim(),
+    });
     return ownerId;
   }
 
-  String _newOwnerId() {
-    final random = Random.secure();
-    final suffix = List<int>.generate(
-      16,
-      (_) => random.nextInt(256),
-    ).map((byte) => byte.toRadixString(16).padLeft(2, '0')).join();
-    return 'owner_${DateTime.now().microsecondsSinceEpoch}_$suffix';
-  }
+  String _newOwnerId() => RecordId.create('owner');
 
-  String getActiveSitterId() {
-    return HiveBoxes.getValue(
-          HiveBoxes.settingsBoxName,
-          _activeSitterIdKey,
-          defaultValue: 'sitter_1',
-        ) as String? ??
-        'sitter_1';
-  }
+  String getActiveSitterId() =>
+      HiveBoxes.getValue(HiveBoxes.settingsBoxName, _activeSitterIdKey)
+          as String;
 
   Future<void> setActiveSitterId(String sitterId) async {
     await HiveBoxes.putValue(
@@ -211,113 +150,88 @@ class SettingsRepository {
     );
   }
 
-  String getSitterName() {
-    return HiveBoxes.getValue(
-          HiveBoxes.settingsBoxName,
-          _sitterNameKey,
-          defaultValue: AppStrings.defaultSitterFullName,
-        ) as String? ??
-        AppStrings.defaultSitterFullName;
+  String getSitterName() => _sitterProfile()['name'] as String;
+
+  Future<void> setSitterName(String name) =>
+      updateSitterProfile(sitterId: getActiveSitterId(), name: name);
+
+  String getSitterEmail() => _sitterProfile()['email'] as String;
+
+  Future<void> setSitterEmail(String email) =>
+      updateSitterProfile(sitterId: getActiveSitterId(), email: email);
+
+  Future<void> updateSitterProfile({
+    required String sitterId,
+    String? name,
+    String? email,
+  }) async {
+    if (getActiveSitterId() != sitterId) throw StateError('Account changed');
+    final nextName = name ?? getSitterName();
+    final nextEmail = email?.trim() ?? getSitterEmail();
+    if (email != null) {
+      validateProfileEmail(nextEmail, UserRole.sitter, sitterId);
+    }
+    final identities = sitterIdsByEmail();
+    if (email != null) {
+      identities.removeWhere((_, id) => id == sitterId);
+      identities[nextEmail.toLowerCase()] = sitterId;
+    }
+    await HiveBoxes.putValues(HiveBoxes.settingsBoxName, {
+      'sitter_ids_by_email': identities,
+      'sitter_profile_$sitterId': <String, dynamic>{
+        'name': nextName,
+        'email': nextEmail,
+      },
+    });
   }
 
-  Future<void> setSitterName(String name) async {
-    await HiveBoxes.putValue(HiveBoxes.settingsBoxName, _sitterNameKey, name);
+  Future<void> activateSitter({
+    required String sitterId,
+    required String name,
+    required String email,
+  }) async {
+    validateProfileEmail(email, UserRole.sitter, sitterId);
+    final previousId = getActiveSitterId();
+    final identities = sitterIdsByEmail()
+      ..removeWhere((_, id) => id == sitterId);
+    identities[email.trim().toLowerCase()] = sitterId;
+    await HiveBoxes.putValues(HiveBoxes.settingsBoxName, {
+      if (previousId != sitterId)
+        'sitter_profile_$previousId': <String, dynamic>{
+          'name': getSitterName(),
+          'email': getSitterEmail(),
+        },
+      'sitter_profile_$sitterId': <String, dynamic>{
+        'name': name,
+        'email': email.trim(),
+      },
+      'sitter_ids_by_email': identities,
+      _activeSitterIdKey: sitterId,
+    });
   }
 
-  String getSitterEmail() {
-    return HiveBoxes.getValue(
-          HiveBoxes.settingsBoxName,
-          _sitterEmailKey,
-          defaultValue: AppStrings.defaultSitterEmail,
-        ) as String? ??
-        AppStrings.defaultSitterEmail;
-  }
+  Map<String, dynamic> sitterIdsByEmail() => Map<String, dynamic>.from(
+    HiveBoxes.getValue(HiveBoxes.settingsBoxName, 'sitter_ids_by_email') as Map,
+  );
 
-  Future<void> setSitterEmail(String email) async {
-    await HiveBoxes.putValue(HiveBoxes.settingsBoxName, _sitterEmailKey, email);
-  }
+  Map<String, dynamic> _sitterProfile() => Map<String, dynamic>.from(
+    HiveBoxes.getValue(
+      HiveBoxes.settingsBoxName,
+      'sitter_profile_${getActiveSitterId()}',
+    ) as Map,
+  );
 
-  String getActiveDogId() {
-    return HiveBoxes.getValue(
-          HiveBoxes.settingsBoxName,
-          activeDogIdKey,
-          defaultValue: HiveSeedData.initialDog.id,
-        ) as String? ??
-        HiveSeedData.initialDog.id;
-  }
+  String getActiveDogId() => HiveBoxes.getValue(
+    HiveBoxes.settingsBoxName,
+    '${activeDogIdKey}_${getOwnerId()}',
+    defaultValue: '',
+  ) as String;
 
   Future<void> setActiveDogId(String dogId) async {
-    await HiveBoxes.putValue(HiveBoxes.settingsBoxName, activeDogIdKey, dogId);
-  }
-
-  String _chatMessagesKey(String contactKey) {
-    if (contactKey.trim().isEmpty) {
-      throw ArgumentError.value(contactKey, 'contactKey');
-    }
-    return '$_chatMessagesKeyPrefix$contactKey';
-  }
-
-  static String conversationKey({
-    required String ownerId,
-    required String sitterId,
-  }) => ConversationIdentity.key(ownerId: ownerId, sitterId: sitterId);
-
-  String _resolveConversationKey({
-    String? contactKey,
-    String? ownerId,
-    String? sitterId,
-  }) {
-    if (ownerId != null && sitterId != null && contactKey == null) {
-      return conversationKey(ownerId: ownerId, sitterId: sitterId);
-    }
-    if (contactKey != null && ownerId == null && sitterId == null) {
-      return contactKey;
-    }
-    throw ArgumentError(
-      'Provide both participant IDs or a legacy contact key.',
-    );
-  }
-
-  List<ChatMessage> getChatMessages({
-    String? contactKey,
-    String? ownerId,
-    String? sitterId,
-  }) {
-    final raw = HiveBoxes.getValue(
-      HiveBoxes.settingsBoxName,
-      _chatMessagesKey(
-        _resolveConversationKey(
-          contactKey: contactKey,
-          ownerId: ownerId,
-          sitterId: sitterId,
-        ),
-      ),
-    ) as List<dynamic>?;
-    if (raw == null || raw.isEmpty) {
-      return <ChatMessage>[];
-    }
-    return raw
-        .map((e) => ChatMessage.fromMap(Map<dynamic, dynamic>.from(e as Map)))
-        .toList();
-  }
-
-  Future<void> addChatMessage(
-    ChatMessage message, {
-    String? contactKey,
-    String? ownerId,
-    String? sitterId,
-  }) async {
-    final key = _resolveConversationKey(
-      contactKey: contactKey,
-      ownerId: ownerId,
-      sitterId: sitterId,
-    );
-    final current = getChatMessages(contactKey: key);
-    final updated = <ChatMessage>[...current, message];
     await HiveBoxes.putValue(
       HiveBoxes.settingsBoxName,
-      _chatMessagesKey(key),
-      updated.map((m) => m.toMap()).toList(),
+      '${activeDogIdKey}_${getOwnerId()}',
+      dogId,
     );
   }
 }

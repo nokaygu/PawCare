@@ -4,6 +4,7 @@ import '../../../app/router/app_router.dart';
 import '../../../core/constants/app_dimens.dart';
 import '../../../core/constants/app_strings.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/widgets/async_action_builder.dart';
 import '../controller/auth_controller.dart';
 import '../widgets/auth_modal_header.dart';
 import 'signup_modal.dart';
@@ -125,7 +126,7 @@ class _LoginFormContent extends StatelessWidget {
   final TextEditingController passwordController;
   final bool obscurePassword;
   final VoidCallback onToggleObscure;
-  final VoidCallback onSubmit;
+  final Future<void> Function() onSubmit;
   final AppRouter router;
 
   const _LoginFormContent({
@@ -172,7 +173,7 @@ class _LoginFormContent extends StatelessWidget {
 }
 
 class _LoginSubmitButton extends StatelessWidget {
-  final VoidCallback onSubmit;
+  final Future<void> Function() onSubmit;
 
   const _LoginSubmitButton({required this.onSubmit});
 
@@ -183,19 +184,22 @@ class _LoginSubmitButton extends StatelessWidget {
     return SizedBox(
       width: double.infinity,
       height: AppDimens.buttonHeight,
-      child: ElevatedButton(
-        onPressed: onSubmit,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: colors.primary,
-          foregroundColor: colors.onPrimary,
-          elevation: AppDimens.zero,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppDimens.radiusLg),
+      child: AsyncActionBuilder(
+        action: onSubmit,
+        builder: (_, run, busy) => ElevatedButton(
+          onPressed: run,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: colors.primary,
+            foregroundColor: colors.onPrimary,
+            elevation: AppDimens.zero,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(AppDimens.radiusLg),
+            ),
           ),
-        ),
-        child: Text(
-          AppStrings.loginButton,
-          style: textTheme.titleMedium?.copyWith(color: colors.onPrimary),
+          child: Text(
+            busy ? AppStrings.saving : AppStrings.loginButton,
+            style: textTheme.titleMedium?.copyWith(color: colors.onPrimary),
+          ),
         ),
       ),
     );

@@ -1,4 +1,116 @@
+import '../../data/models/money.dart';
+
 abstract final class AppStrings {
+  static const missingListingTitle = 'İlan kaydı okunamıyor';
+  static const missingListingBody =
+      'Kayıt bulunamadı veya bozulmuş. Asıl veriler korunuyor. Hesap ekranından başka bir hesabı açabilirsiniz.';
+  static const openAccounts = 'Hesap ekranına git';
+  static const photoIntentCleanupFailed =
+      'Fotoğraf kaydedildi; seçim kaydı sonraki açılışta yeniden kontrol edilecek.';
+  static const archivedNotifications = 'Bildirim arşivi';
+  static const photoCleanupFailed =
+      'Fotoğraf kaydedildi. Eski dosya henüz temizlenemedi.';
+  static const retry = 'Yeniden dene';
+  static const startupErrorTitle = 'Kayıtlar açılamadı';
+  static const startupErrorBody =
+      'Yerel veriler açılırken bir hata oluştu. Kayıtlarınız silinmedi. Tekrar deneyebilirsiniz.';
+  static String invalidRecordsNotice(int count) =>
+      '$count kayıt okunamadı. Asılları korunuyor.';
+  static const chatTitle = 'Konuşma';
+  static const olderMessages = 'Önceki mesajlar';
+  static const recentMessages = 'Son mesajlar / Yeniden dene';
+  static const previousPage = 'Önceki sayfa';
+  static const nextPage = 'Sonraki sayfa';
+  static String pageInfo(int page, int total) => '$page / $total';
+  static const noHealthRecordsTitle = 'Aşı kaydı bulunmuyor';
+  static const noHealthRecordsBody =
+      'Sağlık kartından aşı kayıtlarını ekleyebilirsiniz.';
+  static const unknownVaccineDateTitle = 'Aşı tarihini kontrol edin';
+  static const unknownVaccineDateBody =
+      'Bu kayıtta tarih belirtilmedi; tamamlanmış kabul edilmedi.';
+  static const dateUnknown = 'Tarih bilinmiyor';
+  static const statusOverdue = 'Gecikti';
+  static const notProvided = 'Bilgi girilmedi';
+  static const noNutritionPlan =
+      'Kayıtlı beslenme planı yok. Veterinerinizin verdiği planı ekleyebilirsiniz.';
+  static const nutritionPlanLabel =
+      'Veteriner tarafından verilen beslenme planı';
+  static const veterinarianNameLabel = 'Veteriner adı (isteğe bağlı)';
+  static const invalidVaccineDate = 'Geçerli bir aşı tarihi seçin.';
+  static const invalidPetFields =
+      'Ad, ırk, geçerli yaş ve ağırlık bilgilerini kontrol edin.';
+  static const duplicateMicrochip =
+      'Bu mikroçip kimliği başka bir kayıtta kullanılıyor.';
+  static const invalidAuthFields =
+      'Geçerli bir e-posta ve en az 8 karakterli demo şifresi girin.';
+  static const invalidEmail = 'Geçerli bir e-posta adresi girin.';
+  static const upcomingReservationTitle = 'Sıradaki Rezervasyon';
+  static const viewReservation = 'Rezervasyonu gör';
+  static const viewRequests = 'Taleplerimi gör';
+  static const pendingReservationSubtitle =
+      'Onay bekleyen talebiniz var. Son durumu Taleplerim ekranından takip edebilirsiniz.';
+  static String pendingReservations(int count) => '$count talep onay bekliyor';
+  static String otherReservations(int count) => 'Diğer $count rezervasyonu gör';
+  static String trackingPair(String sitter, String pet) => '$sitter & $pet';
+  static String overdueVaccineTitle(String title) => 'Geciken aşı: $title';
+  static String vaccineDays(int days) => days < 0
+      ? '${-days} gün gecikti'
+      : days == 0
+      ? 'Bugün'
+      : '$days gün kaldı';
+  static const unitNight = 'gece';
+  static const unitDay = 'gün';
+  static const unitHour = 'saat';
+  static const bookingPriceChanged =
+      'İlanın ücreti değişti. Güncel tutarı kontrol edip tekrar gönderin.';
+  static const bookingSaveFailed =
+      'İşlem kaydedilemedi. Bilgileriniz korunuyor; tekrar deneyebilirsiniz.';
+  static const invalidBookingAction =
+      'Bu rezervasyon için işlem artık uygun değil. Listeyi yenileyin.';
+  static const invalidPrice = 'Geçerli bir ücret girin (0–1.000.000 TL arası).';
+  static const statusCancelled = 'İptal Edildi';
+  static const completeService = 'Hizmeti tamamla';
+  static const serviceCompleted = 'Hizmet tamamlandı.';
+  static const serviceStartTime = 'Başlangıç saati';
+  static const serviceDuration = 'Yürüyüş süresi';
+  static const capacityLabel = 'Aynı anda kabul edilen köpek sayısı';
+  static const invalidCapacity = 'Kapasite 1 ile 100 arasında olmalıdır.';
+  static const awaitingCompletionTitle = 'Tamamlanmayı bekleyen hizmetler';
+  static const saving = 'Kaydediliyor…';
+  static String durationHours(int hours) => '$hours $unitHour';
+  static String startTimeLabel(String time) => '$serviceStartTime: $time';
+  static String bookingPeriod(
+    DateTime start,
+    DateTime end, {
+    bool hourly = false,
+    bool dayCare = false,
+  }) {
+    final shownEnd = dayCare
+        ? end.subtract(const Duration(microseconds: 1))
+        : end;
+    final dates = formatDateRange(start, shownEnd);
+    if (!hourly) return dates;
+    String clock(DateTime d) =>
+        '${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';
+    return '$dates · ${clock(start)}–${clock(end)}';
+  }
+
+  static const notificationDeliveryFailed =
+      'İşlem kaydedildi, ancak bildirimi oluşturmak mümkün olmadı.';
+  static const noPetsTitle = 'Henüz kayıtlı köpeğiniz yok';
+  static const noPetsBody =
+      'Profil ve sağlık kayıtlarını yönetmek veya rezervasyon yapmak için köpeğinizi ekleyin.';
+  static const addFirstPet = 'İlk köpeğimi ekle';
+  static const ownerDashboardSubtitle =
+      'Dostunuzun bakım planını buradan takip edin.';
+  static String notificationTime(DateTime createdAt, DateTime now) {
+    final elapsed = now.difference(createdAt);
+    if (elapsed.inMinutes < 1) return timeNow;
+    if (elapsed.inMinutes < 60) return '${elapsed.inMinutes} dk önce';
+    if (elapsed.inHours < 24) return '${elapsed.inHours} saat önce';
+    return formatShortDate(createdAt);
+  }
+
   // Brand & App
   static const String appName = 'PawCare';
   static const String appTitle = 'PawCare — Evcil Hayvan Yönetimi';
@@ -96,7 +208,7 @@ abstract final class AppStrings {
     return '${formatShortDate(start)} - ${formatShortDate(end)}';
   }
 
-  static String currencyAmount(num amount) => '₺${amount.toInt()}';
+  static String currencyAmount(num amount) => Money.format(amount);
   static String ratingAndReviewCount(double rating, int count) =>
       '$rating ($count)';
   static String nameAndLocation(String name, String location) =>
@@ -104,7 +216,7 @@ abstract final class AppStrings {
   static String categoryAndLocation(String category, String location) =>
       '$category • $location';
   static String priceCalculation(double price, int units, String unit) =>
-      '₺${price.toInt()} x $units $unit';
+      '${Money.format(price)} x $units $unit';
   static String contactWithPet(String name, String petName) =>
       '$name & $petName';
   static String unitSuffix(String unit) => '/$unit';
@@ -145,8 +257,6 @@ abstract final class AppStrings {
 
   // Owner Home
   static String greetingOwner(String ownerName) => 'Merhaba, $ownerName 👋';
-  static String dogStatusGreat(String dogName) =>
-      'Bugün $dogName için her şey yolunda!';
   static String ageYearsBadge(int ageYears) => '$ageYears Yaş';
   static String weightKgValue(double weightKg) => '$weightKg kg';
   static String breedAndWeight(String breed, double weightKg) =>
@@ -169,22 +279,18 @@ abstract final class AppStrings {
   static const String todaysReservationTitle = 'Günün Rezervasyonu';
   static const String liveWalkingBadge = 'Yürüyüşte • Canlı';
   static const String activeReservationBadge = 'Rezervasyon Aktif';
-  static const String noActiveReservationBadge = 'Planlı Bakım Yok';
   static const String noActiveReservationTitle =
       'Bugün için onaylı aktif rezervasyonunuz bulunmuyor.';
   static const String noActiveReservationSubtitle =
       'Dostunuz için güvenilir otel, gündüz bakımı veya yürüyüş hizmetlerini hemen inceleyebilirsiniz.';
   static const String exploreSittersButton = 'Hizmetleri Keşfet';
   static const String defaultWalkerName = 'Mert Demir';
-  static const String defaultWalkerAvatar = 'assets/images/mert.jpg';
   static const String defaultWalkLocation = 'Caddebostan Sahil Parkı';
-  static const String defaultWalkTimeSlot = '14:00 - 15:00';
-  static const String defaultWalkerRating = ' 5.0';
-  static const String liveTrackingButton = 'Canlı Takip';
+  static const String liveTrackingButton = 'Takip Demosu';
   static const String chatButton = 'Sohbet';
   static const String featuredServicesTitle = 'Öne Çıkan Hizmetler';
   static String pricePerUnitShort(double price, String unitLabel) =>
-      '₺${price.toInt()}/$unitLabel';
+      '${Money.format(price)}/$unitLabel';
 
   // Explore / Discovery
   static const String categoryAll = 'Tümü';
@@ -201,8 +307,10 @@ abstract final class AppStrings {
   static const String exploreSearchHint =
       'Bakıcı, otel veya ilçe ara (örn. Kadıköy)...';
   static const String advancedFilterTitle = 'Gelişmiş Filtreleme';
-  static String maxPriceLabel(double maxPrice) =>
-      'Maksimum Ücret: ₺${maxPrice.toInt()}';
+  static const budgetUnlimited = 'Ücret sınırı yok';
+  static String maxPriceLabel(double? maxPrice) => maxPrice == null
+      ? budgetUnlimited
+      : 'Maksimum Ücret: ${Money.format(maxPrice)}';
   static String budgetChipLabel(double budget) => '₺${budget.toInt()} ve altı';
   static const String sortCriteriaTitle = 'Sıralama Ölçütü';
   static const String sortByLowestPriceLabel = 'En Düşük Fiyata Göre Sırala';
@@ -234,8 +342,6 @@ abstract final class AppStrings {
   static const String inspectAndRequestButton = 'İncele ve Talep Gönder';
 
   // Sitter Detail & Booking Request
-  static const String defaultCareNotes =
-      'Barley tavuk alerjisine sahip, kendi maması çantada teslim edilecektir.';
   static const String dateRangeSelectionTitle = 'Tarih Aralığı Seçimi';
   static const String bookingRangeUnavailableError =
       'Lütfen geçmiş veya dolu günleri içermeyen geçerli bir tarih aralığı seçin.';
@@ -275,13 +381,9 @@ abstract final class AppStrings {
   static const String nutritionAndBehaviorTitle =
       'Beslenme & Davranış Özellikleri';
   static const String dailyNutritionPlanTitle = 'Günlük Beslenme Planı';
-  static const String dailyNutritionPlanBody =
-      'Günde 2 öğün 280g kuzu etli kuru mama (sabah 08:30 / akşam 19:00). Bol taze su.';
   static const String socialBehaviorTitle = 'Sosyal Davranış & Karakter';
   static const String responsibleVetClinicTitle = 'Sorumlu Veteriner Kliniği';
-  static const String chiefVetSubtitle = 'Dr. Selin Bulut • Başhekim';
-  static String vetCallContactName(String clinicName) =>
-      '$clinicName (Dr. Selin Bulut)';
+  static String vetCallContactName(String clinicName) => clinicName;
   static const String vetEmergencySubtitle =
       'Veteriner Kliniği Acil & Randevu Hattı';
   static const String callNowButton = 'Hemen Ara';
@@ -289,7 +391,6 @@ abstract final class AppStrings {
   static String dogProfileUpdatedSnack(String dogName) =>
       '$dogName profil bilgileri güncellendi.';
   static String dogAddedSnack(String dogName) => '$dogName başarıyla eklendi!';
-  static const String saveDogButton = 'Köpeği Kaydet';
   static const String fieldDogName = 'Köpek Adı';
   static const String fieldBreed = 'Irk / Cins';
   static const String fieldWeightKg = 'Kilo (kg)';
@@ -298,27 +399,6 @@ abstract final class AppStrings {
   static const String fieldBehaviorNote = 'Beslenme & Davranış';
   static const String fieldVetClinic = 'Veteriner Kliniği';
   static const String fieldClinicPhone = 'Klinik Telefon';
-  static const String defaultNewDogName = 'Tarçın';
-  static const String defaultNewDogBreed = 'Cavalier King Charles';
-  static const String defaultNewDogAge = '2';
-  static const String defaultNewDogWeight = '8.5';
-  static const String defaultNewDogGender = 'Dişi (Kısır)';
-  static const String defaultNewDogMicrochip = 'TR-900-2026-44510';
-  static const String defaultNewDogAllergy =
-      'Tahılsız mamalar tercih edilmelidir.';
-  static const String defaultNewDogBehavior =
-      'Diğer köpeklerle çok iyi anlaşır, oyuncak topunu çok sever.';
-  static const String defaultNewDogClinic = 'Moda Pati Veteriner Polikliniği';
-  static const String defaultNewDogPhone = '+90 216 345 67 89';
-  static const String fallbackBreed = 'Golden Retriever';
-  static const String fallbackGender = 'Erkek (Kısır)';
-  static const String fallbackAllergy =
-      'Bilinen ilaç veya gıda alerjisi bulunmamaktadır.';
-  static const String fallbackBehavior =
-      'Uysal, sosyal ve yürüyüş tasmasına alışkındır.';
-  static const String initialVaccineTitle = 'Karma Aşı (DHPPi+L)';
-  static const String initialVaccineDueDate = '26 Ekim 2026';
-  static const String fallbackVaccineDueDate = '15 Aralık 2026';
   static String digitalIdentityTitle(String dogName) =>
       '$dogName — Dijital Kimlik';
   static String clinicPrefix(String clinicName) => 'Klinik: $clinicName';
@@ -327,22 +407,11 @@ abstract final class AppStrings {
   static const String vaccineAndTreatmentRecordsTitle =
       'Aşı ve Tedavi Kayıtları';
   static const String addVaccineButton = 'Yeni Aşı / Tedavi Ekle';
-  static String upcomingVaccineBannerTitle(String title) =>
-      'Yaklaşan Aşı: $title';
-  static const String allVaccinesUpToDateTitle = 'Tüm Aşılar Güncel!';
-  static String upcomingVaccineBannerSubtitle(String dueDate, String vetName) =>
-      '$dueDate • Hekim: $vetName';
-  static const String noPlannedVaccineSubtitle =
-      'Bekleyen planlı aşı kaydı bulunmuyor.';
   static String vaccineDateAndVet(String dueDate, String vetName) =>
       'Tarih: $dueDate • $vetName';
   static const String fieldVaccineTitle = 'Aşı / Tedavi Adı';
   static const String fieldPlannedDate = 'Planlanan Tarih';
   static const String fieldVetName = 'Veteriner Hekim';
-  static const String defaultVaccineTitle = 'Lyme Aşısı';
-  static const String defaultVaccineDate = '10 Aralık 2026';
-  static const String defaultVaccineVet = 'Dr. Selin Bulut';
-
   // Notifications (Dynamic Controller Messages)
   static const String notifBookingCancelledTitle =
       'Rezervasyon Talebi İptal Edildi';
@@ -371,6 +440,7 @@ abstract final class AppStrings {
       'Rezervasyon Durumu Güncellendi';
   static const String statusWordApproved = 'onaylandı';
   static const String statusWordRejected = 'reddedildi';
+  static const String statusWordCompleted = 'tamamlandı';
   static String notifBookingStatusUpdatedBody(
     String petName,
     String serviceTitle,
@@ -392,8 +462,8 @@ abstract final class AppStrings {
   static const String kpiPendingSubtitle = 'Talep';
   static const String kpiConfirmedTitle = 'Onaylı';
   static const String kpiConfirmedSubtitle = 'Rezervasyon';
-  static const String kpiEarningsTitle = 'Kazanç';
-  static const String kpiEarningsSubtitle = 'Bu ay';
+  static const String kpiEarningsTitle = 'Onaylı toplam';
+  static const String kpiEarningsSubtitle = 'Bu ay · brüt';
   static const String incomingRequestsTitle = 'Yeni Gelen Talepler';
   static const String allRequestsAnsweredTitle = 'Tüm talepler yanıtlandı!';
   static const String noPendingRequestsSubtitle =
@@ -413,14 +483,9 @@ abstract final class AppStrings {
       'Şu anda aktif veya onaylı konuk bulunmuyor.';
   static const String noActiveGuestsSubtitle =
       'Yeni gelen talepleri onayladığınızda konuklar burada listelenir.';
-  static const String checkedInBadge = 'Giriş Yapıldı';
-  static const String defaultActiveGuestService =
-      'Oda: Süit 3 • 2 Gece Konaklama';
-  static const String registeredContactSubtitle = 'Kayıtlı İletişim Numarası';
-  static const String defaultOwnerPhone = '+90 532 890 12 34';
   static const String myListingAndPricesTitle = 'İlanım & Fiyatlarım';
   static String unitPriceLabel(double price, String unitLabel) =>
-      'Birim Ücret ($unitLabel): ₺${price.toInt()}';
+      'Birim Ücret ($unitLabel): ${Money.format(price)}';
   static String fieldUnitPrice(String unitLabel) =>
       'Birim Ücret ($unitLabel / ₺)';
   static const String editListingAndPriceButton = 'İlanı ve Ücreti Düzenle';
@@ -434,9 +499,9 @@ abstract final class AppStrings {
   static const String availabilityCalendarHint =
       'Dolu olarak işaretlemek istediğiniz günlere dokunun.';
   static const String reviewsTabTitle = 'Değerlendirmeler';
-  static const String reviewsSummaryScore = '4.9 / 5.0 (128 Yorum)';
+  static const String reviewsSummaryScore = 'Örnek değerlendirmeler';
   static const String reviewsSummarySubtitle =
-      'Köpek sahiplerinin bıraktığı doğrulanmış konaklama yorumları.';
+      'Aşağıdaki yorumlar örnektir; bu hesabın müşteri değerlendirmeleri değildir.';
   static const List<(String, String, String)> sitterReviewsList =
       <(String, String, String)>[
         (
@@ -459,14 +524,14 @@ abstract final class AppStrings {
   // Profile & Modals
   static const String accountAndProfileTitle = 'Hesap & Profil';
   static const String settingsAndPreferencesTitle = 'Ayarlar & Tercihler';
-  static const String sitterProfileRoleSubtitle =
-      'Hizmet Veren (Mutlu Patiler Köpek Oteli)';
+  static const String sitterProfileRoleSubtitle = 'Hizmet Veren';
   static String ownerProfileRoleSubtitle(int count, String dogNames) =>
       'Köpek Sahibi ($count Kayıtlı Köpek: $dogNames)';
   static const String darkKhakiThemeTitle = 'Koyu Yeşil (Haki) Tema';
   static const String darkThemeActiveSubtitle = 'Haki Koyu Tema Aktif';
   static const String lightThemeActiveSubtitle = 'Açık Tema Aktif';
-  static const String notificationPreferencesTitle = 'Bildirim Tercihleri';
+  static const phoneNotProvided = 'Telefon bilgisi eklenmemiş';
+  static const String notificationPreferencesTitle = 'Bildirimler';
   static const String switchActiveRoleTitle =
       'Aktif Rolü Değiştir (Sahip / Hizmet Veren)';
   static const String paymentMethodsTitle = 'Ödeme Yöntemleri';
@@ -476,37 +541,35 @@ abstract final class AppStrings {
   static const String editAccountModalTitle = 'Hesap Bilgilerini Düzenle';
   static const String accountUpdatedSnack = 'Hesap bilgileri güncellendi.';
   static const List<String> paymentModalItems = <String>[
-    '• Mastercard **** 4821 (Varsayılan Kart)',
-    '• Visa **** 9014 (Yedek Kart)',
-    '• Tüm ödemeler PawCare Güvence Havuzu ile korunmaktadır.',
+    'Bu yerel demoda kayıtlı kart veya ödeme işlemi yoktur.',
+    'Rezervasyon tutarı yalnız teklif bilgisidir; kartınızdan ücret alınmaz.',
   ];
   static const List<String> privacyModalItems = <String>[
-    '• Verileriniz tamamen cihaz içi (Offline-First Hive) şifresiz yerel depoda tutulur.',
-    '• Konum ve iletişim bilgileriniz yalnızca onayladığınız bakıcılarla paylaşılır.',
-    '• KVKK ve PawCare Güvenlik Standartları aktiftir.',
+    'Kayıtlarınız bu cihazdaki yerel depoda tutulur; sunucuya gönderilmez.',
+    'Hesaplar uygulama içinde ayrılır. Giriş, sunuculu kimlik doğrulama sağlamayan bir demodur.',
+    'Seçtiğiniz profil fotoğrafı uygulamanın yerel klasörüne kopyalanır.',
   ];
   static const List<String> helpModalItems = <String>[
-    '• 7/24 Acil Veteriner & Destek Hattı: +90 850 300 12 34',
-    '• E-posta: destek@pawcare.com',
-    '• Sıkça Sorulan Sorular: Rezervasyon iptali 24 saat öncesine kadar ücretsizdir.',
+    'Bu demoda canlı destek, acil yardım hattı veya hizmet garantisi sunulmaz.',
+    'Bekleyen talepleri veya henüz başlamamış onaylı rezervasyonları iptal edebilirsiniz.',
+    'Başlamış hizmetler iptal edilemez. Bu demoda ödeme ve iade işlemi yapılmaz.',
   ];
 
   // Shared Modals (Call, Chat, Live Tracking)
   static const String phoneCallTitle = 'Telefon Araması';
   static const String demoCallDisclaimer =
-      'Demo ortamında arama başlatılacaktır. Gerçek arama için mobil cihaz izinleri gereklidir.';
+      'Bu ekran arama demosudur. Telefon araması başlatmaz.';
   static String callingContactSnack(String name, String phone) =>
-      '$name ($phone) aranıyor...';
-  static const String callActionButton = 'Ara';
-  static const String chatOnlineSubtitle = 'Çevrim içi • Yanıt süresi ~5 dk';
+      'Arama demosu: $name ($phone)';
+  static const String callActionButton = 'Demoyu Göster';
+  static const String chatOnlineSubtitle = 'Yerel demo konuşması';
   static const String chatInputHint = 'Mesajınızı yazın...';
-  static const String liveWalkTrackingTitle = 'Canlı Yürüyüş Takibi';
+  static const String liveWalkTrackingTitle = 'Yürüyüş Takip Demosu';
   static const String marmaraSeaLabel = 'Marmara Denizi (Caddebostan Sahil)';
-  static const String walkerPinBadge = 'Mert & Barley';
   static const String elapsedTimeLabel = 'Geçen Süre';
-  static const String elapsedTimeValue = '24 dakika';
+  static const String elapsedTimeValue = 'Örnek: 24 dakika';
   static const String walkDistanceLabel = 'Yürüyüş Mesafesi';
-  static const String walkDistanceValue = '1.4 km';
+  static const String walkDistanceValue = 'Örnek: 1,4 km';
   static const String liveTrackingDemoDisclaimer =
       'Demo modu simüle edilmiş yürüyüş rotasıdır. Canlı GPS bağlantısı gerektirmez.';
 }

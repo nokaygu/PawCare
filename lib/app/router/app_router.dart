@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 import '../../data/models/models.dart';
+import '../../core/utils/lifecycle_notifier.dart';
 import '../../data/repositories/settings_repository.dart';
 
 @immutable
@@ -47,18 +48,23 @@ class AppRouteState {
   }
 }
 
-class AppRouter extends ValueNotifier<AppRouteState> {
+class AppRouter extends LifecycleNotifier<AppRouteState> {
   final SettingsRepository _settingsRepository;
 
   AppRouter({
     SettingsRepository? settingsRepository,
     bool startWithSplash = false,
+    bool respectFirstLaunch = false,
   }) : _settingsRepository = settingsRepository ?? const SettingsRepository(),
        super(
          AppRouteState(
            role: (settingsRepository ?? const SettingsRepository())
                .getUserRole(),
            showingSplash: startWithSplash,
+           showingWelcome:
+               respectFirstLaunch &&
+               !(settingsRepository ?? const SettingsRepository())
+                   .hasCompletedWelcome,
          ),
        );
 
@@ -68,6 +74,7 @@ class AppRouter extends ValueNotifier<AppRouteState> {
 
   Future<void> setRole(UserRole newRole) async {
     await _settingsRepository.setUserRole(newRole);
+    if (isDisposed) return;
     value = value.copyWith(
       role: newRole,
       showingWelcome: false,
@@ -112,11 +119,20 @@ class AppRouter extends ValueNotifier<AppRouteState> {
     value = value.copyWith(showingSplash: false);
   }
 
-  void openProfileTab() {
-    if (value.role == UserRole.owner) {
-      setOwnerNavIndex(4);
+  bool get canHandleBack =>
+      value.activeDetailSitter != null ||
+      value.showingWelcome ||
+      (role == UserRole.owner ? ownerNavIndex : sitterNavIndex) != 0;
+
+  void handleBack() {
+    if (value.activeDetailSitter != null) {
+      closeSitterDetail();
+    } else if (value.showingWelcome) {
+      closeWelcome();
+    } else if (role == UserRole.owner) {
+      setOwnerNavIndex(0);
     } else {
-      setSitterNavIndex(4);
+      setSitterNavIndex(0);
     }
   }
 }

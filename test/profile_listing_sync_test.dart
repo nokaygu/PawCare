@@ -29,7 +29,7 @@ void main() {
       final other = repository.getAllSitters().firstWhere(
         (sitter) => sitter.id != original.id,
       );
-      final snapshots = const BookingRepository().getAllBookings();
+      final snapshots = BookingRepository().getAllBookings();
       final router = AppRouter();
       final theme = ThemeController();
       addTearDown(router.dispose);
@@ -47,6 +47,17 @@ void main() {
       );
       router.setOwnerNavIndex(1);
       await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(
+        find.text(
+          AppStrings.sitterNameLocationDistance(
+            original.name,
+            original.location,
+            original.distanceKm,
+          ),
+        ),
+        250,
+        scrollable: find.byType(Scrollable).first,
+      );
       expect(
         find.text(
           AppStrings.sitterNameLocationDistance(
@@ -87,6 +98,17 @@ void main() {
       );
       router.setOwnerNavIndex(1);
       await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(
+        find.text(
+          AppStrings.sitterNameLocationDistance(
+            'Ece Kaya',
+            original.location,
+            original.distanceKm,
+          ),
+        ),
+        250,
+        scrollable: find.byType(Scrollable).first,
+      );
       expect(
         find.text(
           AppStrings.sitterNameLocationDistance(
@@ -105,7 +127,7 @@ void main() {
         other.name,
       );
       expect(
-        const BookingRepository().getAllBookings().map(
+        BookingRepository().getAllBookings().map(
           (booking) => booking.sitterName,
         ),
         snapshots.map((booking) => booking.sitterName),
@@ -312,7 +334,11 @@ class _ConflictingEmailSettings extends SettingsRepository {
   const _ConflictingEmailSettings();
 
   @override
-  Future<void> setUserEmail(String email) async {
+  Future<void> updateOwnerProfile({
+    required String ownerId,
+    String? name,
+    String? email,
+  }) async {
     throw ArgumentError(email);
   }
 }

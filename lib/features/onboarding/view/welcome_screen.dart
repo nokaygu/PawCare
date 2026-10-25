@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../app/router/app_router.dart';
 import '../../../core/constants/app_dimens.dart';
+import '../../../core/widgets/async_action_builder.dart';
 import '../../../core/constants/app_strings.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/app_typography.dart';
@@ -171,7 +172,6 @@ class _WelcomeRoleSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
-    final pawTheme = context.pawTheme;
     final textTheme = context.pawTextTheme;
     return ValueListenableBuilder<UserRole>(
       valueListenable: controller,
@@ -184,26 +184,45 @@ class _WelcomeRoleSection extends StatelessWidget {
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: AppDimens.p12),
-          RoleSelectionCard(
-            title: AppStrings.startAsOwnerTitle,
-            subtitle: AppStrings.startAsOwnerSubtitle,
-            icon: Icons.pets,
-            iconBgColor: colors.secondaryContainer,
-            iconColor: colors.primary,
-            isSelected: currentRole == UserRole.owner,
-            onTap: () => controller.selectRoleAndContinue(UserRole.owner),
-          ),
+          _buildOwnerCard(context, currentRole),
           const SizedBox(height: AppDimens.p12),
-          RoleSelectionCard(
-            title: AppStrings.switchToSitterPanelTitle,
-            subtitle: AppStrings.switchToSitterPanelSubtitle,
-            icon: Icons.home_work_outlined,
-            iconBgColor: pawTheme.tertiaryFixed,
-            iconColor: colors.tertiary,
-            isSelected: currentRole == UserRole.sitter,
-            onTap: () => controller.selectRoleAndContinue(UserRole.sitter),
-          ),
+          _buildSitterCard(context, currentRole),
         ],
+      ),
+    );
+  }
+
+  Widget _buildOwnerCard(BuildContext context, UserRole currentRole) {
+    final colors = context.colors;
+
+    return RoleSelectionCard(
+      title: AppStrings.startAsOwnerTitle,
+      subtitle: AppStrings.startAsOwnerSubtitle,
+      icon: Icons.pets,
+      iconBgColor: colors.secondaryContainer,
+      iconColor: colors.primary,
+      isSelected: currentRole == UserRole.owner,
+      onTap: () => performUiAction(
+        context,
+        () => controller.selectRoleAndContinue(UserRole.owner),
+      ),
+    );
+  }
+
+  Widget _buildSitterCard(BuildContext context, UserRole currentRole) {
+    final colors = context.colors;
+    final pawTheme = context.pawTheme;
+
+    return RoleSelectionCard(
+      title: AppStrings.switchToSitterPanelTitle,
+      subtitle: AppStrings.switchToSitterPanelSubtitle,
+      icon: Icons.home_work_outlined,
+      iconBgColor: pawTheme.tertiaryFixed,
+      iconColor: colors.tertiary,
+      isSelected: currentRole == UserRole.sitter,
+      onTap: () => performUiAction(
+        context,
+        () => controller.selectRoleAndContinue(UserRole.sitter),
       ),
     );
   }

@@ -4,7 +4,7 @@ import '../../../core/constants/app_dimens.dart';
 import '../../../core/constants/app_strings.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/app_typography.dart';
-import '../../../core/widgets/modals/chat_modal.dart';
+import '../../chat/view/chat_modal.dart';
 import '../../../core/widgets/paw_avatar_image.dart';
 import '../../../core/widgets/paw_status_badge.dart';
 import '../../../data/models/models.dart';
@@ -64,7 +64,11 @@ class _BookingCardHeader extends StatelessWidget {
       children: <Widget>[
         CircleAvatar(
           radius: AppDimens.avatarRadiusSm,
-          backgroundImage: PawImageProvider.resolve(booking.sitterPhoto),
+          backgroundImage: PawImageProvider.avatar(
+            context,
+            booking.sitterPhoto,
+            radius: AppDimens.avatarRadiusSm,
+          ),
         ),
         const SizedBox(width: AppDimens.p12),
         Expanded(

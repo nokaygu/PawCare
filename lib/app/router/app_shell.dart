@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
 
 import '../../core/constants/app_dimens.dart';
+import '../../core/constants/app_strings.dart';
+import '../../data/local/hive_boxes.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/theme/theme_controller.dart';
 import '../../core/widgets/paw_bottom_nav.dart';
 import '../../data/models/models.dart';
+import '../../data/repositories/booking_repository.dart';
+import '../../core/widgets/unread_notifications_scope.dart';
 import '../../features/bookings/controller/bookings_controller.dart';
 import '../../features/bookings/view/owner_bookings_screen.dart';
 import '../../features/discovery/controller/discovery_controller.dart';
@@ -29,27 +33,87 @@ import 'app_router.dart';
 class AppShell extends StatefulWidget {
   final AppRouter router;
   final ThemeController themeController;
+  final BookingRepository? bookingRepository;
 
   const AppShell({
     super.key,
     required this.router,
     required this.themeController,
+    this.bookingRepository,
   });
 
   @override
   State<AppShell> createState() => _AppShellState();
 }
 
-class _AppShellState extends State<AppShell> {
-  late final NotificationsController _notificationsController;
-  late final OnboardingController _onboardingController;
-  late final PetsController _petsController;
-  late final BookingsController _bookingsController;
-  late final HomeController _homeController;
-  late final DiscoveryController _discoveryController;
-  late final ProviderController _providerController;
-  late final ProfileController _profileController;
+class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
+  late final BookingRepository _bookingRepository =
+      widget.bookingRepository ?? BookingRepository();
+  late final NotificationsController _notificationsController =
+      NotificationsController();
+  OnboardingController? _onboarding;
+  PetsController? _pets;
+  BookingsController? _bookings;
+  HomeController? _home;
+  DiscoveryController? _discovery;
+  ProviderController? _provider;
+  ProfileController? _profile;
+  PageStorageBucket _pageBucket = PageStorageBucket();
   late AppRouteState _previousRouteState;
+
+  OnboardingController get _onboardingController =>
+      _onboarding ??= OnboardingController(router: widget.router);
+  PetsController get _petsController => _pets ??= PetsController(
+    bookingRepository: _bookingRepository,
+    notificationsController: _notificationsController,
+  );
+  HomeController get _homeController => _home ??= HomeController(
+    router: widget.router,
+    petsController: _petsController,
+    bookingRepository: _bookingRepository,
+  );
+  BookingsController get _bookingsController =>
+      _bookings ??= BookingsController(
+        bookingRepository: _bookingRepository,
+        notificationsController: _notificationsController,
+        onBookingsChanged: _syncBookings,
+      );
+  DiscoveryController get _discoveryController =>
+      _discovery ??= DiscoveryController(
+        bookingRepository: _bookingRepository,
+        notificationsController: _notificationsController,
+        onBookingsUpdated: _syncBookings,
+      );
+  ProviderController get _providerController =>
+      _provider ??= ProviderController(
+        router: widget.router,
+        bookingRepository: _bookingRepository,
+        notificationsController: _notificationsController,
+        onBookingsChanged: _syncBookings,
+        onListingsChanged: _syncListings,
+      );
+  ProfileController get _profileController => _profile ??= ProfileController(
+    router: widget.router,
+    themeController: widget.themeController,
+    onProfileChanged: _syncProfile,
+  );
+
+  void _syncBookings() {
+    _bookings?.refresh();
+    _provider?.refreshBookings();
+    _home?.refreshBookings();
+  }
+
+  void _syncListings() {
+    _provider?.refreshListing();
+    _home?.refreshListings();
+    _discovery?.refreshSitters();
+  }
+
+  void _syncProfile() {
+    _home?.refreshOwner();
+    _syncListings();
+  }
 
   void _syncAfterIdentityChange() {
     final previous = _previousRouteState;
@@ -58,184 +122,134 @@ class _AppShellState extends State<AppShell> {
     if (previous.role != current.role ||
         previous.sessionRevision != current.sessionRevision ||
         (previous.showingWelcome && !current.showingWelcome)) {
-      _syncAllListingsAndBookings();
+      _pageBucket = PageStorageBucket();
+      _pets?.refresh();
+      _notificationsController.refresh();
+      _bookings?.refresh();
+      _provider?.refresh();
+      _home?.refreshSitters();
+      _discovery?.refreshSitters();
     }
-  }
-
-  void _syncAllListingsAndBookings() {
-    _bookingsController.refresh();
-    _providerController.refresh();
-    _homeController.refreshSitters();
-    _discoveryController.refreshSitters();
   }
 
   @override
   void initState() {
     super.initState();
-    _notificationsController = NotificationsController();
-    _onboardingController = OnboardingController(router: widget.router);
-    _petsController = PetsController(
-      notificationsController: _notificationsController,
-    );
-    _homeController = HomeController(router: widget.router);
-    _bookingsController = BookingsController(
-      notificationsController: _notificationsController,
-      onBookingsChanged: _syncAllListingsAndBookings,
-    );
-    _providerController = ProviderController(
-      router: widget.router,
-      notificationsController: _notificationsController,
-      onBookingsChanged: _syncAllListingsAndBookings,
-    );
-    _discoveryController = DiscoveryController(
-      notificationsController: _notificationsController,
-      onBookingsUpdated: _syncAllListingsAndBookings,
-    );
-    _profileController = ProfileController(
-      router: widget.router,
-      themeController: widget.themeController,
-      onProfileChanged: _syncAllListingsAndBookings,
-    );
+    WidgetsBinding.instance.addObserver(this);
     _previousRouteState = widget.router.value;
     widget.router.addListener(_syncAfterIdentityChange);
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     widget.router.removeListener(_syncAfterIdentityChange);
+    _home?.dispose();
+    _pets?.dispose();
+    _bookings?.dispose();
+    _discovery?.dispose();
+    _provider?.dispose();
+    _profile?.dispose();
+    _onboarding?.dispose();
     _notificationsController.dispose();
-    _onboardingController.dispose();
-    _petsController.dispose();
-    _bookingsController.dispose();
-    _homeController.dispose();
-    _discoveryController.dispose();
-    _providerController.dispose();
-    _profileController.dispose();
     super.dispose();
   }
 
-  void _openNotifications() {
-    NotificationsModal.show(context, controller: _notificationsController);
-  }
-
-  Widget _buildReactiveShell(BuildContext context, AppRouteState routeState) {
-    return ValueListenableBuilder<List<NotificationItem>>(
-      valueListenable: _notificationsController,
-      builder: (context, _, _) {
-        return _ShellActiveBody(
-          routeState: routeState,
-          router: widget.router,
-          onboardingController: _onboardingController,
-          homeController: _homeController,
-          petsController: _petsController,
-          discoveryController: _discoveryController,
-          bookingsController: _bookingsController,
-          providerController: _providerController,
-          profileController: _profileController,
-          unreadCount: _notificationsController.unreadCount,
-          onOpenNotifications: _openNotifications,
-        );
-      },
-    );
-  }
-
   @override
-  Widget build(BuildContext context) {
-    final pawTheme = context.pawTheme;
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _notificationsController.refresh();
+      _pets?.refreshTime();
+      _home?.refreshTime();
+      _provider?.refreshBookings();
+    }
+  }
 
-    return Scaffold(
-      backgroundColor: pawTheme.shellBackdrop,
-      body: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: AppDimens.maxShellWidth),
-          child: Container(
-            decoration: BoxDecoration(
-              color: pawTheme.background,
-              boxShadow: pawTheme.shellShadow,
-            ),
-            child: ValueListenableBuilder<AppRouteState>(
-              valueListenable: widget.router,
-              builder: (context, routeState, _) =>
-                  _buildReactiveShell(context, routeState),
-            ),
+  void _openNotifications() =>
+      NotificationsModal.show(context, controller: _notificationsController);
+
+  Widget _buildReactiveShell(AppRouteState state) {
+    final showNav =
+        !state.showingSplash &&
+        !state.showingWelcome &&
+        state.activeDetailSitter == null;
+    final owner = state.role == UserRole.owner;
+    return UnreadNotificationsScope(
+      count: _notificationsController.unread,
+      child: PageStorage(
+        bucket: _pageBucket,
+        child: PopScope(
+          canPop: !widget.router.canHandleBack,
+          onPopInvokedWithResult: (didPop, _) {
+            if (!didPop) widget.router.handleBack();
+          },
+          child: Column(
+            children: [
+              if (HiveBoxes.issues.isNotEmpty)
+                SafeArea(
+                  bottom: false,
+                  child: Padding(
+                    padding: const EdgeInsets.all(AppDimens.p12),
+                    child: Text(
+                      AppStrings.invalidRecordsNotice(HiveBoxes.issues.length),
+                    ),
+                  ),
+                ),
+              Expanded(child: _resolveScreen(state)),
+              if (showNav)
+                PawBottomNav(
+                  role: state.role,
+                  currentIndex: owner
+                      ? state.ownerNavIndex
+                      : state.sitterNavIndex,
+                  onTabSelected: owner
+                      ? widget.router.setOwnerNavIndex
+                      : widget.router.setSitterNavIndex,
+                ),
+            ],
           ),
         ),
       ),
     );
   }
-}
-
-class _ShellActiveBody extends StatelessWidget {
-  final AppRouteState routeState;
-  final AppRouter router;
-  final OnboardingController onboardingController;
-  final HomeController homeController;
-  final PetsController petsController;
-  final DiscoveryController discoveryController;
-  final BookingsController bookingsController;
-  final ProviderController providerController;
-  final ProfileController profileController;
-  final int unreadCount;
-  final VoidCallback onOpenNotifications;
-
-  const _ShellActiveBody({
-    required this.routeState,
-    required this.router,
-    required this.onboardingController,
-    required this.homeController,
-    required this.petsController,
-    required this.discoveryController,
-    required this.bookingsController,
-    required this.providerController,
-    required this.profileController,
-    required this.unreadCount,
-    required this.onOpenNotifications,
-  });
 
   @override
-  Widget build(BuildContext context) {
-    final showBottomNav =
-        !routeState.showingSplash &&
-        !routeState.showingWelcome &&
-        routeState.activeDetailSitter == null;
-    final isOwner = routeState.role == UserRole.owner;
-    final currentIndex = isOwner
-        ? routeState.ownerNavIndex
-        : routeState.sitterNavIndex;
-
-    return Column(
-      children: <Widget>[
-        Expanded(child: _resolveScreen()),
-        if (showBottomNav)
-          PawBottomNav(
-            role: routeState.role,
-            currentIndex: currentIndex,
-            onTabSelected: (index) {
-              if (isOwner) {
-                router.setOwnerNavIndex(index);
-              } else {
-                router.setSitterNavIndex(index);
-              }
-            },
+  Widget build(BuildContext context) => Scaffold(
+    backgroundColor: context.pawTheme.shellBackdrop,
+    body: Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: AppDimens.maxShellWidth),
+        child: Container(
+          decoration: BoxDecoration(
+            color: context.pawTheme.background,
+            boxShadow: context.pawTheme.shellShadow,
           ),
-      ],
-    );
-  }
+          child: ValueListenableBuilder<AppRouteState>(
+            valueListenable: widget.router,
+            builder: (_, state, _) => _buildReactiveShell(state),
+          ),
+        ),
+      ),
+    ),
+  );
 
-  Widget _resolveScreen() {
+  Widget _resolveScreen(AppRouteState routeState) {
     if (routeState.showingSplash) {
-      return SplashScreen(onFinished: router.finishSplash);
+      return SplashScreen(onFinished: widget.router.finishSplash);
     }
     if (routeState.showingWelcome) {
-      return WelcomeScreen(router: router, controller: onboardingController);
+      return WelcomeScreen(
+        router: widget.router,
+        controller: _onboardingController,
+      );
     }
     if (routeState.activeDetailSitter != null) {
       return SitterDetailScreen(
         sitter: routeState.activeDetailSitter!,
-        discoveryController: discoveryController,
-        petsController: petsController,
-        onBack: router.closeSitterDetail,
-        onBookingCompleted: () => router.setOwnerNavIndex(3),
+        discoveryController: _discoveryController,
+        petsController: _petsController,
+        onBack: widget.router.closeSitterDetail,
+        onBookingCompleted: () => widget.router.setOwnerNavIndex(3),
       );
     }
     if (routeState.role == UserRole.sitter) {
@@ -247,33 +261,33 @@ class _ShellActiveBody extends StatelessWidget {
   Widget _buildOwnerTab(int index) {
     return switch (index) {
       1 => ExploreScreen(
-        controller: discoveryController,
-        onSitterSelected: router.openSitterDetail,
-        unreadNotifications: unreadCount,
-        onNotificationsTap: onOpenNotifications,
+        controller: _discoveryController,
+        onSitterSelected: widget.router.openSitterDetail,
+        unreadNotifications: 0,
+        onNotificationsTap: _openNotifications,
       ),
       2 => DogProfileScreen(
-        petsController: petsController,
-        unreadNotifications: unreadCount,
-        onNotificationsTap: onOpenNotifications,
+        petsController: _petsController,
+        unreadNotifications: 0,
+        onNotificationsTap: _openNotifications,
       ),
       3 => OwnerBookingsScreen(
-        controller: bookingsController,
-        unreadNotifications: unreadCount,
-        onNotificationsTap: onOpenNotifications,
+        controller: _bookingsController,
+        unreadNotifications: 0,
+        onNotificationsTap: _openNotifications,
       ),
       4 => ProfileScreen(
-        controller: profileController,
-        petsController: petsController,
-        unreadNotifications: unreadCount,
-        onNotificationsTap: onOpenNotifications,
+        controller: _profileController,
+        petsController: _petsController,
+        unreadNotifications: 0,
+        onNotificationsTap: _openNotifications,
       ),
       _ => OwnerHomeScreen(
-        homeController: homeController,
-        petsController: petsController,
-        onSitterSelected: router.openSitterDetail,
-        unreadNotifications: unreadCount,
-        onNotificationsTap: onOpenNotifications,
+        homeController: _homeController,
+        petsController: _petsController,
+        onSitterSelected: widget.router.openSitterDetail,
+        unreadNotifications: 0,
+        onNotificationsTap: _openNotifications,
       ),
     };
   }
@@ -281,29 +295,29 @@ class _ShellActiveBody extends StatelessWidget {
   Widget _buildSitterTab(int index) {
     return switch (index) {
       1 => SitterListingTab(
-        controller: providerController,
-        unreadNotifications: unreadCount,
-        onNotificationsTap: onOpenNotifications,
+        controller: _providerController,
+        unreadNotifications: 0,
+        onNotificationsTap: _openNotifications,
       ),
       2 => SitterCalendarTab(
-        controller: providerController,
-        unreadNotifications: unreadCount,
-        onNotificationsTap: onOpenNotifications,
+        controller: _providerController,
+        unreadNotifications: 0,
+        onNotificationsTap: _openNotifications,
       ),
       3 => SitterReviewsTab(
-        unreadNotifications: unreadCount,
-        onNotificationsTap: onOpenNotifications,
+        unreadNotifications: 0,
+        onNotificationsTap: _openNotifications,
       ),
       4 => ProfileScreen(
-        controller: profileController,
-        petsController: petsController,
-        unreadNotifications: unreadCount,
-        onNotificationsTap: onOpenNotifications,
+        controller: _profileController,
+        petsController: _petsController,
+        unreadNotifications: 0,
+        onNotificationsTap: _openNotifications,
       ),
       _ => SitterDashboardScreen(
-        controller: providerController,
-        unreadNotifications: unreadCount,
-        onNotificationsTap: onOpenNotifications,
+        controller: _providerController,
+        unreadNotifications: 0,
+        onNotificationsTap: _openNotifications,
       ),
     };
   }

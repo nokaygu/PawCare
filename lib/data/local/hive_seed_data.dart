@@ -1,10 +1,38 @@
+import '../../core/constants/app_strings.dart';
 import '../models/models.dart';
 
 class HiveSeedData {
   const HiveSeedData._();
 
-  static const Dog initialDog = Dog(
+  static const demoOwnerId = 'owner_demo';
+
+  static Map<String, dynamic> createInitialSettings() => {
+    'is_dark_mode': false,
+    'welcome_completed': false,
+    'user_role': UserRole.owner.name,
+    'owner_id': demoOwnerId,
+    'user_name': AppStrings.defaultOwnerFullName,
+    'user_email': AppStrings.defaultOwnerEmail,
+    'active_sitter_id': 'sitter_1',
+    'active_dog_id_$demoOwnerId': initialDog.id,
+    'owner_ids_by_email': {AppStrings.defaultOwnerEmail: demoOwnerId},
+    'owner_profiles': {
+      demoOwnerId: {
+        'name': AppStrings.defaultOwnerFullName,
+        'email': AppStrings.defaultOwnerEmail,
+      },
+    },
+    'sitter_ids_by_email': {AppStrings.defaultSitterEmail: 'sitter_1'},
+    for (final sitter in createInitialSitters())
+      'sitter_profile_${sitter.id}': {
+        'name': sitter.name,
+        'email': sitter.id == 'sitter_1' ? AppStrings.defaultSitterEmail : '',
+      },
+  };
+
+  static final Dog initialDog = Dog(
     id: 'dog_1',
+    ownerId: demoOwnerId,
     name: 'Barley',
     breed: 'Golden Retriever',
     ageYears: 2,
@@ -20,30 +48,30 @@ class HiveSeedData {
       Vaccination(
         id: 'v_1',
         title: 'Karma Aşı (DHPPi+L)',
-        dueDate: '26 Ekim 2026',
+        dueAt: DateTime(2026, 10, 26),
         status: VaccineStatus.upcoming,
         vetName: 'Dr. Selin Bulut',
       ),
       Vaccination(
         id: 'v_2',
         title: 'Kuduz Aşısı (Rabies)',
-        dueDate: '14 Haziran 2026',
+        dueAt: DateTime(2026, 6, 14),
         status: VaccineStatus.completed,
         vetName: 'Dr. Selin Bulut',
-        completionDate: '14 Haziran 2026',
+        completedAt: DateTime(2026, 6, 14),
       ),
       Vaccination(
         id: 'v_3',
         title: 'İç & Dış Parazit Tedavisi',
-        dueDate: '02 Eylül 2026',
+        dueAt: DateTime(2026, 9, 2),
         status: VaccineStatus.completed,
         vetName: 'Dr. Selin Bulut',
-        completionDate: '02 Eylül 2026',
+        completedAt: DateTime(2026, 9, 2),
       ),
       Vaccination(
         id: 'v_4',
         title: 'Kennel Cough (Bronşin)',
-        dueDate: '15 Kasım 2026',
+        dueAt: DateTime(2026, 11, 15),
         status: VaccineStatus.upcoming,
         vetName: 'Dr. Selin Bulut',
       ),
@@ -53,6 +81,8 @@ class HiveSeedData {
   static List<SitterListing> createInitialSitters() => <SitterListing>[
     SitterListing(
       id: 'sitter_1',
+      serviceType: ServiceType.hotel,
+      capacity: 4,
       name: 'Ayşe Yılmaz',
       facilityTitle: 'Mutlu Patiler Butik Köpek Oteli',
       category: 'Köpek Oteli',
@@ -84,6 +114,7 @@ class HiveSeedData {
     ),
     SitterListing(
       id: 'sitter_2',
+      serviceType: ServiceType.walk,
       name: 'Mert Demir',
       facilityTitle: 'ProDog Profesyonel Gezdirici & Eğitmen',
       category: 'Köpek Gezdirme',
@@ -108,8 +139,10 @@ class HiveSeedData {
       isVerified: true,
       unavailableDates: <DateTime>[DateTime(2026, 10, 28)],
     ),
-    const SitterListing(
+    SitterListing(
       id: 'sitter_3',
+      serviceType: ServiceType.dayCare,
+      capacity: 6,
       name: 'Selin & Can Kaya',
       facilityTitle: 'Pati Köşkü Gündüz Bakım Evi',
       category: 'Gündüz Bakımı',
@@ -120,28 +153,37 @@ class HiveSeedData {
       location: 'Fenerbahçe, Kadıköy',
       distanceKm: 3.4,
       imagePath: 'assets/images/hotel_garden.jpg',
-      galleryPaths: <String>[
+      galleryPaths: const <String>[
         'assets/images/hotel_garden.jpg',
         'assets/images/ayse.jpg',
       ],
       bio: 'Siz işteyken dostunuz evde yalnız kalmasın. Sosyalleşme seansları, dinlenme odaları ve özel beslenme takibiyle güvenli gündüz bakımı sağlıyoruz.',
-      amenities: <String>[
+      amenities: const <String>[
         'Sosyal Oyun Grubu',
         'İlaç & Diyet Takibi',
         'Ses Yalıtımlı Dinlenme',
       ],
       isVerified: true,
-      unavailableDates: <DateTime>[],
+      unavailableDates: const <DateTime>[],
     ),
   ];
 
   static List<BookingRequest> createInitialBookings() => <BookingRequest>[
     BookingRequest(
       id: 'book_101',
+      ownerId: demoOwnerId,
+      ownerName: 'Aygen',
+      createdAt: DateTime(2026, 10, 23, 12),
+      petId: 'dog_1',
+      serviceType: ServiceType.hotel,
+      units: 2,
+      unitPriceCents: 45000,
+      serviceFeeCents: 5000,
       sitterId: 'sitter_1',
       sitterName: 'Ayşe Yılmaz',
       sitterPhoto: 'assets/images/ayse.jpg',
       petName: 'Barley',
+      petPhotoPath: 'assets/images/barley.jpg',
       petBreed: 'Golden Retriever',
       serviceTitle: 'Köpek Oteli — 2 Gece Konaklama',
       startDate: DateTime(2026, 10, 24),
@@ -152,10 +194,19 @@ class HiveSeedData {
     ),
     BookingRequest(
       id: 'book_100',
+      ownerId: demoOwnerId,
+      ownerName: 'Aygen',
+      createdAt: DateTime(2026, 10, 22, 12),
+      petId: 'dog_1',
+      serviceType: ServiceType.walk,
+      units: 1,
+      unitPriceCents: 25000,
+      serviceFeeCents: 0,
       sitterId: 'sitter_2',
       sitterName: 'Mert Demir',
       sitterPhoto: 'assets/images/mert.jpg',
       petName: 'Barley',
+      petPhotoPath: 'assets/images/barley.jpg',
       petBreed: 'Golden Retriever',
       serviceTitle: 'Caddebostan Sahil Parkı Yürüyüşü',
       startDate: DateTime(2026, 10, 23, 14, 0),
@@ -193,9 +244,12 @@ class HiveSeedData {
     ),
   ];
 
-  static const List<NotificationItem> initialNotifications = <NotificationItem>[
+  static final List<NotificationItem> initialNotifications = <NotificationItem>[
     NotificationItem(
       id: 'notif_1',
+      recipientId: demoOwnerId,
+      recipientRole: UserRole.owner,
+      createdAt: DateTime(2026, 10, 23, 12),
       title: 'Rezervasyon Talebi Oluşturuldu',
       message: 'Ayşe Yılmaz (Mutlu Patiler Köpek Oteli) için 24-26 Ekim konaklama talebiniz iletildi.',
       timeLabel: '10 dk önce',
@@ -204,6 +258,9 @@ class HiveSeedData {
     ),
     NotificationItem(
       id: 'notif_2',
+      recipientId: demoOwnerId,
+      recipientRole: UserRole.owner,
+      createdAt: DateTime(2026, 10, 23, 13),
       title: 'Rezervasyon Onaylandı',
       message: 'Mert Demir ile Caddebostan Sahil Parkı yürüyüş rezervasyonunuz onaylandı.',
       timeLabel: '1 saat önce',
@@ -212,6 +269,9 @@ class HiveSeedData {
     ),
     NotificationItem(
       id: 'notif_3',
+      recipientId: demoOwnerId,
+      recipientRole: UserRole.owner,
+      createdAt: DateTime(2026, 10, 23, 11),
       title: 'Yaklaşan Aşı Hatırlatıcısı',
       message: 'Barley için Karma Aşı (DHPPi+L) randevusuna 3 gün kaldı (26 Ekim 2026).',
       timeLabel: '3 saat önce',
@@ -220,6 +280,9 @@ class HiveSeedData {
     ),
     NotificationItem(
       id: 'notif_4',
+      recipientId: demoOwnerId,
+      recipientRole: UserRole.owner,
+      createdAt: DateTime(2026, 10, 23, 14, 18),
       title: 'Canlı Yürüyüş Durumu',
       message: 'Mert Demir & Barley yürüyüşte: 1.4 km tamamlandı, su molası verildi.',
       timeLabel: 'Dün',
