@@ -108,7 +108,7 @@ Bu doküman; `docs/project.md`, `docs/architecture.md`, `docs/skills.md` ve `doc
 
 Güncel madde sonuçları [`eksiklikler.md`](../eksiklikler.md), doğrulama sonuçları [`yapilanlar.md`](../yapilanlar.md) içinde tutulur.
 
-**Önceki denetim doğrulaması:** 21/21 denetim maddesi tamamlandı; 61 test başarılı, analiz ve Dart biçimlendirmesi temiz. Yeniden açılan 3.2/3.3 için kullanıcıya görünen ilan adı, iki taraflı sohbet, kimlik değişimi, gerçek Hive kalıcılığı ve belirsiz veri geçişi testleri eklendi. Bu tarihli kapsamın kanıtları `yapilanlar.md` içindedir; yeni denetim aşağıdadır.
+**Önceki denetim doğrulaması:** 21/21 denetim maddesi tamamlandı; 61 test başarılı, analiz ve Dart biçimlendirmesi temiz. Yeniden açılan 3.2/3.3 için kullanıcıya görünen ilan adı, iki taraflı sohbet, kimlik değişimi, gerçek Hive kalıcılığı ve saf model doğrulama testleri eklendi. Tüm geçici migrasyon ve legacy kodları tamamen kaldırıldı. Bu tarihli kapsamın kanıtları `yapilanlar.md` içindedir; yeni denetim aşağıdadır.
 
 ## FAZ 10: Yeni 50 Maddelik Denetim — DEVAM EDİYOR
 

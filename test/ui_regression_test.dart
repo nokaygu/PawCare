@@ -139,6 +139,7 @@ void main() {
         _scrollable(
           TodaysReservationLiveCard(
             activeBooking: booking,
+            now: DateTime(2026, 10, 25, 12),
             onExplore: () => explored = true,
           ),
         ),

@@ -71,19 +71,41 @@ class HiveBoxes {
     await openAndSeedBoxes();
   }
 
+  static Future<Box<dynamic>> _openBoxSafely(String boxName) async {
+    try {
+      return await Hive.openBox<dynamic>(boxName);
+    } catch (_) {
+      try {
+        await Hive.deleteBoxFromDisk(boxName);
+      } catch (_) {}
+      return await Hive.openBox<dynamic>(boxName);
+    }
+  }
+
+  static Future<LazyBox<dynamic>> _openLazyBoxSafely(String boxName) async {
+    try {
+      return await Hive.openLazyBox<dynamic>(boxName);
+    } catch (_) {
+      try {
+        await Hive.deleteBoxFromDisk(boxName);
+      } catch (_) {}
+      return await Hive.openLazyBox<dynamic>(boxName);
+    }
+  }
+
   static Future<void> openAndSeedBoxes() async {
     _requiresPersistentStorage = true;
-    final dogsBox = await Hive.openBox<dynamic>(dogsBoxName);
-    final sittersBox = await Hive.openBox<dynamic>(sittersBoxName);
-    final bookingsBox = await Hive.openBox<dynamic>(bookingsBoxName);
-    final notificationsBox = await Hive.openBox<dynamic>(notificationsBoxName);
-    final settingsBox = await Hive.openBox<dynamic>(settingsBoxName);
+    final dogsBox = await _openBoxSafely(dogsBoxName);
+    final sittersBox = await _openBoxSafely(sittersBoxName);
+    final bookingsBox = await _openBoxSafely(bookingsBoxName);
+    final notificationsBox = await _openBoxSafely(notificationsBoxName);
+    final settingsBox = await _openBoxSafely(settingsBoxName);
 
-    final conversationsBox = await Hive.openBox<dynamic>(conversationsBoxName);
-    final messagesBox = await Hive.openLazyBox<dynamic>(messagesBoxName);
-    final archiveBox = await Hive.openLazyBox<dynamic>(archiveBoxName);
+    final conversationsBox = await _openBoxSafely(conversationsBoxName);
+    final messagesBox = await _openLazyBoxSafely(messagesBoxName);
+    final archiveBox = await _openLazyBoxSafely(archiveBoxName);
 
-    await Hive.openLazyBox<dynamic>(quarantineBoxName);
+    await _openLazyBoxSafely(quarantineBoxName);
 
     final needsDemoSeed = settingsBox.get('initial_data_created') != true;
     if (needsDemoSeed) {
@@ -136,7 +158,11 @@ class HiveBoxes {
       'sitter_ids_by_email': (v) =>
           v is Map && v.values.every((id) => id is String),
     };
+    final defaults = HiveSeedData.createInitialSettings();
     for (final entry in types.entries) {
+      if (!settings.containsKey(entry.key) && defaults.containsKey(entry.key)) {
+        await settings.put(entry.key, defaults[entry.key]);
+      }
       final raw = settings.get(entry.key);
       if (entry.value(raw)) continue;
       await Hive.lazyBox<dynamic>(quarantineBoxName).put(

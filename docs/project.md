@@ -65,11 +65,11 @@ Sohbet geçmişi kararlı sahip–bakıcı kimlik çiftine göre ayrılır ve ro
 
 ### Önceki 21 maddelik denetimin sonucu
 
-21/21 rapor maddesi tamamlandı; 61 test başarılı ve Flutter analizi temiz. Bakıcı profil adı doğru kalıcı ilanla eşitlenerek Home/Keşfet/panelde gösterilir. Farklı sahiplerin aynı bakıcıyla konuşmaları ayrılır; isim/e-posta değişikliği konuşma kimliğini değiştirmez. Aynı rol içindeki hesap geçişi kayıtları yeniler. Eski atanamayan mesajlar silinmeden Hive arşivinde korunur. Yerel demo kapsamı devam eder; son kanıtlar `eksiklikler.md` ve `yapilanlar.md` içindedir.
+21/21 rapor maddesi tamamlandı; 61 test başarılı ve Flutter analizi temiz. Bakıcı profil adı doğru kalıcı ilanla eşitlenerek Home/Keşfet/panelde gösterilir. Farklı sahiplerin aynı bakıcıyla konuşmaları ayrılır; isim/e-posta değişikliği konuşma kimliğini değiştirmez. Aynı rol içindeki hesap geçişi kayıtları yeniler. Tüm veriler doğrudan saf, tip güvenli Hive modelleri üzerinden çalışır; geçici migrasyon ve legacy kodları projeden tamamen kaldırılmıştır (Sıfır Legacy & Sıfır Migrasyon Politikası).
 
 ## 8. Yeni denetim — Adım 1
 
-İlk adım sonunda **6/50 tamamlandı, 44 açık**; 71 test başarılı ve analiz temiz. Köpek sahipliği ve aktif köpek seçimi hesaba bağlıdır; yeni sahip başka kişinin köpeğini görmez ve boş durumdan ekleme yapar. Bildirim alıcısı/rolü ve olay tarihi kalıcıdır. Her yeni bakıcının kendi kararlı kimliği ve yayınlanmamış ilan taslağı vardır; giriş bu hesabın rolünü ve ilanını geri yükler. İlan bilgileri tamamlanınca taslak kataloğa katılır. İlk kurulumdan sonraki bilinçli boş listeler yeniden demo veriyle doldurulmaz. Eski sahipsiz pet/bildirim kayıtları yeni hesaba atanmaz; eski demo kimliğinde korunur.
+İlk adım sonunda **6/50 tamamlandı, 44 açık**; 71 test başarılı ve analiz temiz. Köpek sahipliği ve aktif köpek seçimi hesaba bağlıdır; yeni sahip başka kişinin köpeğini görmez ve boş durumdan ekleme yapar. Bildirim alıcısı/rolü ve olay tarihi kalıcıdır. Her yeni bakıcının kendi kararlı kimliği ve yayınlanmamış ilan taslağı vardır; giriş bu hesabın rolünü ve ilanını geri yükler. İlan bilgileri tamamlanınca taslak kataloğa katılır. İlk kurulumdan sonraki bilinçli boş listeler yeniden demo veriyle doldurulmaz. Kod tabanında legacy adaptörleri veya ara geçiş sınıfları bulunmaz; doğrudan saf Hive modelleri geçerlidir.
 
 
 <!-- audit-progress:start -->

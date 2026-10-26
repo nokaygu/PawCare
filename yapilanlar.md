@@ -79,14 +79,14 @@
 | `test/widget_test.dart` | 3 | Model dönüşümü, repository, iki rol arasında uygulama geçişi |
 | `test/core_calendar_test.dart` | 5 | Dolu gün, ters aralık, aynı gün, ay sınırı ve yeni seçim |
 | `test/core_chat_test.dart` | 2 | Gönderici rolü ve gönderim sırasında pencere kapatma |
-| `test/data_repositories_test.dart` | 7 | Seed fabrikaları, fallback sıfırlama, kişi bazlı sohbet, migrasyon, sayısal sıralama, gerçek Hive kapat/aç kalıcılığı |
+| `test/data_repositories_test.dart` | 7 | Seed fabrikaları, fallback sıfırlama, kişi bazlı sohbet, tip güvenliği, sayısal sıralama, gerçek Hive kapat/aç kalıcılığı |
 | `test/pets_controller_test.dart` | 7 | Liste cache'i, aşı/köpek güncelleme, kayıt/temizlik sırası, başarısız kayıt, paylaşılan ve rezervasyonda kullanılan fotoğraf koruması |
 | `test/data_image_storage_test.dart` | 2 | Gerçek dosya silme, FileImage/avatar cache tahliyesi ve asenkron eksik görsel fallback |
 | `test/ui_regression_test.dart` | 7 | Filtre sıfırlama, aktif/boş kart animasyonu, bütün konuklar, tarih/dar ekran, dinamik birim ve eksik tarih gönderim engeli |
 | `test/controller_sync_test.dart` | 7 | Home cache/tarih, iptal/profil/kayıt senkronizasyonu, yıl sınırı, aylık kazanç ve güncel müsaitlik doğrulaması |
 | `test/profile_listing_sync_test.dart` | 5 | Gerçek Home/Keşfet/panel adı, boş ad, e-posta çakışması, diğer ilan/snapshot koruması, Hive restart |
 | `test/conversation_ui_test.dart` | 5 | Aynı bakıcı/farklı sahip, aynı sahip/farklı bakıcı, ad/e-posta değişimi, iki rol, eski callback ile yanlış kimlikten gönderim engeli |
-| `test/conversation_repository_test.dart` | 9 | Çakışmayan kimlik çiftleri, aynı adlı sahipler, kalıcılık, güvenli eski veri geçişi ve başlangıç ilan adı onarımı |
+| `test/conversation_repository_test.dart` | 9 | Çakışmayan kimlik çiftleri, aynı adlı sahipler, kalıcılık, saf model doğrulama ve başlangıç ilan adı onarımı |
 | `test/session_isolation_test.dart` | 2 | Aynı rolde hesap geçişi, sahip rezervasyon izolasyonu ve bakıcı kaydında ilan adı |
 
 ### Son tamamlanan adımlar
@@ -94,10 +94,10 @@
 - [x] **3.2:** Profil adı ilgili kalıcı ilana yazıldı; Home/Keşfet/panel görünen metinleri ve diskte kalıcılığı kontrol edildi.
 - [x] **3.3:** `ownerId + sitterId` sohbet kimliği, rezervasyon sahipliği, iki rolün aynı konuşmaya erişmesi ve diğer kişilerin geçmişlerinin ayrılması tamamlandı.
 - [x] **Hesap geçişi:** Sahip adı/e-postası ve rezervasyon cache'leri aynı rol içinde giriş/kayıtta yenileniyor. Sahipler kendi rezervasyonlarını, hizmet veren kendi ilanının taleplerini görüyor.
-- [x] **Eski veri:** Eksik sahip kimlikleri tamamlandı; tanınan geçmiş taşındı; belirsiz mesaj havuzları silinmeden arşivlendi. İşlem tekrarı ve Hive kapat/aç testleri geçti.
+- [x] **Sıfır Legacy / Sıfır Migrasyon:** Tüm geçici migration sınıfları ve legacy adaptör kodları tamamen kaldırıldı; doğrudan saf, tip güvenli Hive modelleri üzerinden çalışılıyor.
 - [x] **Doğrulama:** 61 test geçti; Flutter analizi, Dart biçimlendirmesi ve diff kontrolü temiz. README ile ilgili bütün proje belgeleri güncellendi.
 
-Önceki denetimdeki iki eksik senaryo geçici kanıt testlerinden kalıcı testlere taşındı. Önceki 21 maddelik denetimde **21 tamamlanmış, 0 açık** madde vardı; yeni denetimin güncel sayıları aşağıdadır. Yerel hesap kimlikleri sunuculu kimlik doğrulama anlamına gelmez. Belirsiz eski mesajlar etkin konuşma ekranına aktarılmaz; Hive arşivinde korunur.
+Önceki denetimdeki iki eksik senaryo geçici kanıt testlerinden kalıcı testlere taşındı. Önceki 21 maddelik denetimde **21 tamamlanmış, 0 açık** madde vardı; yeni denetimin güncel sayıları aşağıdadır. Doğrudan tip güvenli saf Hive modelleri kullanılır; kod tabanında ara migration veya legacy sınıfları bulunmaz.
 
 
 Proje yerel Hive/demo kapsamındadır. Önceki denetimde kutu boşsa tohumlama politikası korunmuştu; yeni uygulamada ilk kurulum işareti kullanılır; kayıtlı sohbet boş listeleri tekrar demo mesajlarla doldurulmaz. Fotoğraflar ancak başka bir köpek veya rezervasyon kullanmıyorsa temizlenir.

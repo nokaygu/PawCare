@@ -84,7 +84,7 @@ linter:
 - Yeni sahip kimliği görüntülenen ad veya e-postadan türetilmez. E-posta hesap eşlemesi, değişmeyen `ownerId` değerini bulmak içindir; profil güncellemesi kimliği değiştirmez.
 - Sohbet okuma/yazma çağrıları `ownerId` ve `sitterId` değerlerini zorunlu alır. Tek bakıcı anahtarına geri dönüş eklenmez.
 - Profil senkronizasyonu testi yalnız state alanını değil gerçek Home/Keşfet/panel metinlerini kontrol eder. Sohbet testi farklı bakıcıların yanı sıra aynı bakıcıyla görüşen farklı sahipleri, aynı adlı kişileri ve rol değişimini de kapsar.
-- Eski veride muhatap güvenle belirlenemiyorsa mesaj başka bir kişinin konuşmasına kopyalanmaz; aslı arşivde korunur. Geçiş, yeniden çalıştırma ve Hive kapat/aç testleriyle doğrulanır.
+- Konuşmalar doğrudan `ConversationIdentity.key` üzerinden sahibe ve bakıcıya bağlanır. Kod tabanında geriye dönük eski veri geçiş veya migrasyon katmanları eklenmez (Sıfır Migrasyon Kuralı).
 
 ## 6. Yeni denetim hesap sınırları
 
@@ -98,7 +98,7 @@ linter:
 ## Geçmiş ve platform doğrulaması
 
 - Sohbet View kodu `features/chat/` altındadır. Geçmiş okumaları `ConversationRepository` üzerinden asenkron ve sayfalıdır; SettingsRepository içine mesaj listesi ekleme.
-- Bozuk kayıt asıllarını ve legacy arşivini koru. Kalıcı modda açılmayan kutuyu test fallback belleğiyle gizleme.
+- Bozuk kayıt asıllarını koru. Kalıcı modda açılmayan kutuyu test fallback belleğiyle gizleme. Kod tabanında legacy/migration kodları ve geçici köprüler oluşturulmaz; doğrudan saf Hive şeması geçerlidir.
 - Picker açılmadan işlem/hedef hesap/pet kimliği kalıcılaşır. Geri yükleme seçili petten bağımsız özgün hedefi kullanır; yabancı veya kayıp hedefe dosya yazılmaz.
 - Birim/Hive testi ile Android süreç öldürme, iOS izin akışı, macOS sandbox ve imzalı yayın paketini ayrı raporla. Cihazda yapılmayan kabulü tamamlandı sayma.
 

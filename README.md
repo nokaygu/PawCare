@@ -15,8 +15,9 @@
 - **Çoklu Köpek Yönetimi, Sağlık Kartı ve Dijital Kimlik:**
   - **Profili Düzenle & Yeni Köpek Ekle (`dog_form_modals.dart`):** Hem Ana Sayfa hem Köpeklerim sekmesinden mevcut köpeğin tüm bilgilerini düzenleme veya yeni köpek ekleyip köpekler arasında (`DogSelectorChipsRow`) tek dokunuşla geçiş yapma.
   - **Dinamik Aşı Karnesi & Mikroçip Kimliği:** Yeni aşı ekleme, mevcut aşıların durumunu (`Tamamlandı` / `Yaklaşıyor` / `Gecikti`) tek dokunuşla güncelleme, yaklaşan aşı uyarılarını otomatik görüntüleme ve Metin Mikroçip Kimliği (`MicrochipIdentityModal`) kartı.
-- **Saf Hive Yerel Veri Katmanı (Sıfır JSON & Sıfır Harici Backend):**
+- **Saf Hive Yerel Veri Katmanı (Sıfır JSON, Sıfır Legacy & Sıfır Migrasyon):**
   - Başlangıç verileri (`lib/data/local/hive_seed_data.dart`) doğrudan saf Dart nesneleri olarak `Hive` kutularına (`dogs_box`, `sitters_box`, `bookings_box`, `notifications_box`, `settings_box`) yalnız ilk demo kurulumunda tohumlanır. Ayrı konuşma metadatası, mesaj, arşiv ve karantina kutuları kullanılır; mesaj/arşiv/karantina gövdeleri LazyBox içinde tutulur.
+  - **Sıfır Legacy / Sıfır Migrasyon Politikası:** Projede hiçbir şekilde geriye dönük uyumluluk veya ara geçiş için geçici `migration` sınıfları, `legacy` kimlik alanları (`owner_legacy`, `legacyOwnerId`) veya eski şema dönüştürücüler bulunmaz ve eklenemez. Tüm veri akışı doğrudan saf, tip güvenli güncel modeller (`lib/data/models/models.dart`) ile yürütülür.
 - **Kalıcı Yerel Fotoğraf Yönetimi:**
   - `image_picker` ve `path_provider` ile galeriden seçilen köpek fotoğrafları uygulama belgeler dizinine en fazla 1.600 piksel kenarla kaydedilir. Küçük görseller hedef boyutta çözülür; bekleyen galeri seçiminin hesap/köpek hedefi süreç yeniden açılışında korunur.
 - **Merkezi Tasarım Sistemi ("Warm Companion" & Koyu Yeşil / Haki Tema):**
@@ -61,8 +62,10 @@ lib/
 │           └── live_tracking_modal.dart
 ├── data/
 │   ├── local/
+│   │   ├── history_maintenance.dart
 │   │   ├── hive_boxes.dart
-│   │   └── hive_seed_data.dart
+│   │   ├── hive_seed_data.dart
+│   │   └── record_validation.dart
 │   ├── models/
 │   │   └── models.dart
 │   └── repositories/
